@@ -1,0 +1,21 @@
+AC_INIT([viskit],[0.1],[peter@newton.cx])
+AC_CONFIG_SRCDIR([doc/dataset.txt])
+
+AM_INIT_AUTOMAKE([dist-bzip2])
+
+AM_MAINTAINER_MODE
+
+AC_PROG_CC
+AM_PROG_CC_C_O dnl For per-target CFLAGS
+
+PKG_CHECK_MODULES(GLIB, glib-2.0 >= 2.16)
+AC_SUBST([GLIB_CFLAGS])
+AC_SUBST([GLIB_LIBS])
+
+AC_CONFIG_HEADERS([config.h])
+AC_CONFIG_FILES([
+Makefile
+src/Makefile
+])
+
+AC_OUTPUT

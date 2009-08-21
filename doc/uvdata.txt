@@ -1,0 +1,306 @@
+MIRIAD Visibility Dataset Format documentation
+==============================================
+
+Abstract Definition
+-------------------
+
+A MIRIAD visibility dataset (DS) is a container format for
+interferometric visibility data. It is a particular incarnation of the
+general dataset (cf dataset.txt) format.
+
+The model for the visibility data is a stream of changing values of
+named "UV variables". Each variable is identified by a name and is
+described by a type, a size (i.e., the number of instances of the
+variable type that constitute a "value" for the variable), and a
+value. As the UV data are streamed, the values and *sizes* of various
+variables can be updated. The type of a variable may not be updated.
+In theory, variable values can be changed arbitrarily, but the
+semantics of the UV variables strongly limit the avaiable choices.
+
+The stream of UV variable values is grouped into "records". When the
+end of a record is reached, the set of values for all of the defined
+variables defines a UV visibility record. Some variables vary for
+every record; some never or rarely change.
+
+UV variables are are somewhat similar to DS items (in that they have
+names, types, sizes, and values), but should not be confused with
+them. DS items can, however, be used to override the values of UV
+variables.
+
+As with DS items, UV variable names must be 8 characters or fewer in
+length. They must consist of lower-case letters or digits and start
+with a letter. A dataset may define no more than 256 UV variables.
+
+*** Standard items
+
+A visibility DS MUST include the following items:
+
+* obstype (short a[*])
+  One of the strings "autocorrelation", "crosscorrelation", or
+  "mixed-auto-cross". Specifies which sorts of visibilities are
+  present in the visibility data.
+
+* vislen (l) [i in MIR3]
+  The size of the "visdata" DS item in bytes, plus four???
+
+* ncorr (l) [i in MIR3]
+  The number of spectral correlation records in the visibility
+  data.
+
+* nwcorr (l) [i in MIR3]
+  The number of "wide" correlation records in the visibility data.
+
+* vartable (long a[*])
+  A table of the UV variables used in this dataset. Its format is
+  specified below.
+
+* visdata (long binary[vislen-4])
+  A binary encoding of the stream of UV variables. Its format is
+  specified below.
+
+A visibility DS SHOULD include a "history" item as defined for
+MIRIAD DSs in general.
+
+A visibility DS MAY include the following items, depending on what
+information is available and what operations the user has performed on
+the data:
+
+* bandpass (long c)
+  Per-antenna bandpass calibrations.
+
+* flags (long i[*])
+  A binary encoding of the flag status of the spectral
+  correlations. More details below.
+
+* freq0 (d)
+  The reference frequency for the delay terms in 'gains'.
+
+* freqs (long binary)
+  Table of frequencies used in 'bandpass'.
+
+* gains (long binary)
+  Per-antenna gain/phase and delay calibrations.
+
+* interval (d [days])
+  The gain interpolation interval allowed.
+
+* leakage (long? c)
+  Polarization leakage parameters.
+
+* nchan0 (i)
+  "Total number of channels in the bandpass function."
+
+* nfeeds (i)
+  The number of feeds on each antenna (1 or 2).
+
+* ngains (i)
+  The number of antenna gains in each 'gains' record (> 0).
+
+* nsols (i)
+  The number of gains records in 'gains' (> 0).
+
+* nspect0 (i)
+  "Number of windows in the bandpass function."
+
+* ntau (i)
+  The number of delays per antenna in 'gains' (0 or 1).
+
+* wflags (long i[*])
+  A binary encoding of the flag status of the wide correlations.
+  More details below.
+
+As mentioned above, a UV DS MAY include further items with the name
+of any UV variable. Such items must have the type and dimension 
+appropriate for such a variable. Such items override the values of
+any instances of their respective UV variables in the UV stream.
+
+UV Data Stream Semantics
+------------------------
+
+UV variables and their values can be grouped into various functional
+blocks. The details of variables are documented in uvvars.txt. We
+omit observatory-specific variables.
+
+*** Visibility data
+
+baseline
+coord
+corr
+npol
+pol
+time
+tscale
+wcorr
+
+These variables specify the key data about a single visibility record:
+when it was obtained, the antennas involved and the UVW coordinate
+they define, and the actual correlations. The UVW coordinates can 
+actually be rederived from the timing metadata and the antenna
+positions: see the MIRIAD task UVREDO.
+
+*** Visibility secondary data
+
+bin
+chi
+evector
+jyperk
+lst
+nbin
+systemp
+ut
+veldop
+vsource
+wsystemp
+
+*** Correlator configuration
+
+freq
+inttime
+ischan
+nchan
+nschan
+nspect
+nwide
+restfreq ?
+sdf
+wfreq
+wwidth
+
+*** Pointing
+
+antaz
+antel
+axismax
+axisrms
+ddec
+dec
+deldec
+daz
+delra
+dra
+epoch
+obsdec
+obsra
+on
+pntdec
+pntra
+ra
+refpnt ?
+source
+
+*** Observation metadata
+
+observer
+obsline
+operator
+project
+telescop
+version
+
+*** Array metadata
+
+antdiam
+antpos
+latitud
+longitu
+mount
+nants
+pbfwhm
+pbtype
+
+*** Weather
+
+airtemp
+dewpoint
+precipmm
+pressmb
+rain
+relhumid
+wind
+winddir
+windmph
+
+*** Planet observation metadata
+
+plangle
+plmaj
+plmin
+pltb
+
+Item Formats
+------------
+
+*** vartable
+
+The "vartable" item contains a line-oriented textual table listing
+the UV variables present in the stream. Each line is formatted
+as a single character, followed by a space, follow by a variable
+name. Any other line structure is invalid.
+
+The file MUST end with a newline.
+
+The single character specifies the type of the variable using the
+usual abbreviations.
+
+Each variable is assigned an integer identifier based on its order
+in the file. The variable specified in the first line has an
+identifier of 0, the next of 1, and so on. No more than 256 variables
+may be defined.
+
+*** visdata
+
+The "visdata" item contains a stream of UV variable names and values
+collected into records. Each record is assembled from one or more
+entries. The stream of records begins immediately in the item, with
+*no* header indicating the format of the item.
+
+Each entry begins with a 4-byte header composed of an i8 ("var"), a byte of
+padding, an i8 ("type"), and another byte of padding.
+
+Valid values of "type" are:
+
+0x00 - this is a "size entry"
+0x01 - this is a "data entry"
+0x02 - "EOR": the current record ends.
+
+If type is not 0x02, the value of "var" specifies the identifier of
+the variable whose size or value is being given. This identifier is
+derived from the "vartable" DS item.
+
+In the case of a size entry, the header is followed by an i32 giving
+the number of bytes in the data entry that will be consumed by
+subsequent data entries for the variable. The number of values that
+this corresponds to can be computed from the known type of the
+variable. This count does not include the padding bytes used to
+align the data.
+
+In the case of a data entry, the file is first padded with ignored
+bytes to bring the data to an alignment appropriate for the variable
+type. (This type is known from the "vartable" DS item.) A number N
+elements of the variable's data type then follow, where N is the
+most recently specified size for the variable. Sufficient padding
+follows to align the bytestream to an 8-byte boundary.
+
+The stream of values MUST end with an EOR indicator.
+
+*** flags
+
+The "flags" item is in the mask format. It defines the flags applied
+to the spectral correlation data.
+
+*** wflags
+
+The "wflags" item is in the mask format. It defines the flags applied
+to the wideband correlation data.
+
+*** bandpass
+
+TBD.
+
+*** freqs
+
+TBD.
+
+*** gains
+
+TBD.

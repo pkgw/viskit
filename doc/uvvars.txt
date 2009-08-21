@@ -1,0 +1,456 @@
+MIRIAD UV Variables
+===================
+
+Arrays have later indices varying faster a la standard C convention.
+This is different than the standard MIRIAD documentation, which uses
+the opposite FORTRAN convention.
+
+Most entries are copied out of ATNF MIRIAD documentation with some
+annotations.
+
+airtemp r [degrees centigrade]
+ Air temperature at observatory at time in stream.
+
+antaz d[nants] [degrees]
+ Aziumuth of antennas. BIMA apparently used 0 = south;
+ others (CARMA at least) use 0 = north.
+
+antdiam r [meters]
+ Diameter of antenna primary.
+
+antel d[nants] [degrees]
+ Elevation of antennas.
+
+antpos d[3,nants] [nanosec]
+ Equatorial coordinates of the antennas. The X coordinate is along
+ the local meridian, not the Greenwich meridian.
+
+atten i [dB] [BIMA/CARMA]
+ Attenuator settings
+
+axismax r[nants,2] [arcsec]
+ Maximum tracking error in a cycle. First entry is az, second is el.
+
+axisoff r[nants] [ns] [CARMA]
+ Horizontal offset between azimuth and elevation axes.
+
+axisrms r[nants,2] [arcsec]
+ RMS tracking error. First entry is az, second is el.
+
+baseline r
+ The current antenna baseline. Encoded as
+
+ baseline = 256 * ant1 + ant2 or
+  = 2048 * ant1 + ant2 + 65536 if ant1 or ant2 is > 256.
+
+ where ant1 < ant2.
+ UVW coordinates of the baseline are XYZ[ant2] - XYZ[ant2]. This
+ is the opposite of the AIPS and FITS convention.
+
+ FIXME: minimum ant1 is 0 or 1?
+
+bin i
+ Pulsar bin number
+
+cable d[nants] [ns] [BIMA]
+ Measured length of IF cable.
+
+calcode a [] [ATCA]
+ ATCA "calcode" flag.
+
+chi [r or r[nants]] [radians]
+ Position angle of the X feed relative to the sky. This is the
+ sum of the parallactic angle and the "evector" variable. If
+ this variable is single-valued, all ants are assumed to have
+ the same value.
+
+chi2 r [radians] [SMA]
+ "Second feed angle variation."
+
+coord d[2 or 3] [ns]
+ UV or UVW coordinates of the current baseline. If unspecified,
+ W is 0. "What epoch??".
+
+corbit r [] [BIMA]
+ Number of correlator bits.
+
+corbw r[2] [MHz] [BIMA]
+ Correlator bandwidth setting. Allowable values for BIMA are
+ 1.25, 2.5, 5, 10, 20, 40, 80.
+
+corfin r[4] [MHz] [BIMA]
+ "Correlator LO setting before Doppler tracking. This is the LO
+ frequency at zero telescopy velocity. Must be in the range 80 
+ to 550 MHz."
+
+cormode i [] [BIMA]
+ Correlator mode. 1: 1 window/sideband, 256 channels.
+ 2: 2 windows/sideband, 128 channels.
+ 3: 4 windows/sideband, 64 channels, single sideband.
+ 4: 4 windows/sideband, 64 channels, double sideband.
+
+coropt i [] [BIMA]
+ 0: cross-correlation ; 1: auto-correlation.
+ Redundant with "obstype" UV DS item.
+
+corr [j or r][nchan] (2*nchan?)
+ Spectral correlation data. Natively complex, but can be stored
+ as J for space efficiency.
+
+cortaper r [] [BIMA]
+ On-line correlation taper at edge of the window. Valid values 
+ are between 0 and 1 inclusive.
+
+dazim r[nants] [radians] [CARMA]
+ Offset in azimuth when mosaicking.
+
+ddec r [radians]
+ Offset in declination "dec" in epoch specified by "epoch".
+ Actual observed dec is "dec" + "ddec".
+
+dec [r or d] [radians]
+ Declination of phase center. "epoch" defines coordinate
+ system. See also "obsdec".
+
+delay d[nants] [ns] [HCRO]
+ Delay setting at beginning of integration.
+
+delay0 r[nants] [ns] [HCRO]
+ "Delay offset for antennas."
+
+deldec [r or d] [radians]
+ Dec. of delay tracking center. "epoch" defines coordinate system.
+ If unspecified, assumed to track phase center.
+
+delev [r] [radians] [CARMA]
+ Analogous to daz.
+
+delra [r or d] [radians]
+ Analogous to deldec.
+
+dewpoint r [degrees centigrade] [BIMA]
+ Dew point at weather station.
+
+dra r [radians]
+  Offset in RA from "ra" in coordinate system defined by
+  "epoch". Actual observed RA is "ra + dra/cos (dec)" -- that is,
+  the RA offset is specified as an angular offset, not the change
+  in the RA coordinate.
+
+epoch r [years]
+  The mean equinox and equator for the equatorial coordinate system.
+  "The epoch of the coordinates is actually the observing time."
+  If less than 1984.0, treated as a Besselian year in the FK4 system.
+  Otherwise, treated as Julian year in the FK5 system.
+
+evector [r or r[nants]] [radians]
+  Position angle of the X feed to the local vertical. If only one
+  value specified, applies to all ants.
+
+focus r[nants] [V] [BIMA]
+  Focus setting
+
+freq d [GHz]
+  Rest frequency of the "primary line".
+
+freqif d [GHz] [BIMA?]
+  IF frequency?
+
+inttime r [s]
+  The integration time of each data sample.
+
+ischan i[nspect]
+  The starting channel of each spectral window in the correlation
+  data. FIXME: 0 or 1 based?
+
+ivalued i[nants] [] [BIMA]
+  "Delay step. Used in an attempt to calibrate amp and phase vs. delay."
+
+jyperk r [Jy/K]
+  The antenna efficiency in Janskys per Kelvin for the current sample.
+
+jyperka r[nants] [sqrt(Jy/K)] [BIMA]
+  The antenna-based Jy/K.
+
+latitud d [radians]
+  The geodetic latitude of the observatory (-> array center?)
+
+lo1 d [GHz] [BIMA/CARMA]
+  First LO frequency, 70 - 115 for 3mm observations.
+
+lo2 d [GHz] [BIMA]
+  Second LO frequency.
+
+longitu d [rad]
+  Geodetic longitude of the observatory (-> array center?)
+
+lst d [rad]
+  Local apparent sidereal time.
+
+modedesc a [] [CARMA]
+  Correlator mode description.
+
+mount [i or i[nants]]
+  Type of antenna mount. 0: alt-az ; 1: equatorial ; 2: X-Y ;
+  3: orbiting ; 4: other.
+
+name a [] [ATCA}
+  "raw RPFITS file name."
+
+nants i
+  The number of antennas. Antenna numbers start at 1.
+
+nbin i
+  The number of pulsar bins
+
+nchan i
+  The total number of frequency channels (across all windows).
+
+npol i
+  The number of "simultaneous polarizations" -- polarization
+  records recorded for every sample.
+
+nschan i[nspect]
+  Number of channels in each spectral window.
+
+nspect i
+  The number of spectral windows.
+
+ntemp i [BIMA?]
+  The number of antenna thermistors.
+
+ntpower i [BIMA?]
+  "The number of total power measurements."
+
+nwide i
+  The number of wideband channels in each sample.
+
+obsdec d [rad]
+  The *apparent* declination of the phase center at the time
+  of observation -- this includes precession, nutation, etc.
+
+observer a
+  The name of the observer
+
+obsline a
+  The name of the primary spectral line of interest to the
+  observer.
+
+obsra d [rad]
+  analogous to "obsdec".
+
+on i
+  1: on-source pointing ; 0: off-source ; -1: TSys spectrum
+  for autocorrelations.
+
+operator a
+  The name of the operator.
+
+pbfwhm r [arcsec]
+  Deprecated. The FWHM of the primary beam. Use "pbtype" 
+  instead.
+
+pbtype a
+  Primary beam type of the array. FIXME: possible values?
+
+phaselo1 r[nants] [rad] [BIMA/CARMA]
+  "Antenna phase offset"
+
+phaselo2 r[nants] [rad] [BIMA/CARMA]
+  "Second LO phase offset"
+
+phasem1 r[nants] [rad] [BIMA/CARMA]
+  "IF cable phase."
+
+plangle r [deg]
+  Planet angle
+
+plmaj r [arcsec]
+  Planet major axis
+
+plmin r [arcsec]
+  Planet minor axis
+
+pltb r [K]
+  Planet brightness temperature.
+
+pntdec [r or d] [rad]
+  Pointing center declination in coordinate system defined
+  by "epoch". If unspecified, assumed to coincide with that
+  defined by "dec". ("obsdec"?)
+
+pntra [r or d] [rad]
+  Analogous to pntdec.
+
+pol i 
+  Polarization type of sample. Values follow the AIPS/FITS
+  convention: 1: Stokes I ; 2: Stokes Q, 3: Stokes U; 4: Stokes V;
+  -1: circular RR; -2: LL; -3: RL; -4: LR; -5: linear XX; 
+  -6: YY; -7: XY; -8: YX.
+
+precipmm r [mm]
+  Amount of precipitable water vapor in the atmosphere.
+
+pressmb r [mBar]
+  Atmospheic pressure.
+
+project a
+  Name of the current observing project.
+
+purpose a [] [CARMA]
+  Scientific purpose of the given observation:
+  B: bandpass cal; F: flux cal; G: phase/amp gain cal;
+  P: pol cal; R: radio pointing; S: science target;
+  O: other.
+
+ra [r or d] [rad]
+  Analogous to "dec".
+
+rain r [mm] [ATCA]
+  amount of water in the rain gauge. Emptied at 0900 AEST for ATCA.
+
+refpnt r[nants,2] [arcsec]
+  Reference pointing offsets: first entry az, second el.
+
+relhumid r [percentage]
+  Relative humidity at observatory.
+
+restfreq d[nspect] [GHz]
+  Rest frequency for each spectral window. Zero for continuum
+  observations.
+
+rmspath r [microns or percentage] [BIMA/CARMA]
+  RMS path variation. Microns for CARMA, percentage for BIMA.
+  See also "smonrms".
+
+sctype a [] [ATCA?]
+  Scan type.
+
+sdf d[nspect] [GHz]
+  Change in frequency between channels for each spectral window.
+
+sfreq d[nspect] [GHz]
+  Sky frequency of center of first channel in each spectral window.
+
+smonrms r [microns] [ATCA]
+  Seeing monitor RMS value (see also rmspath).
+
+source a
+  The name of the current source]
+
+srv2k r[nants] [?] [BIMA]
+  ?
+
+systemp [r or r[nants] or r[nspect,nants]] [K]
+  Antenna system temperatures.
+
+tau230 r [] [BIMA/CARMA]
+  Optical depth at 230 GHz as measured somehow.
+
+tcorr i [] [ATNF/CARMA]
+  Whether the TSys correction has been applied (0: no,
+  1: yes). What is this correction?
+
+telescop a
+  The name of the telescope in use. Values: ATCA,
+  HATCREEK (=BIMA), VLA, WSRT, ATA.
+
+temp r[ntemp,nants] [centigrade] [BIMA]
+  Antenna thermistor temperatures
+
+themt r[nants] [K] [BIMA]
+  Temperature of HEMT amplifier.
+
+tif2 r[nants] [K] [BIMA]
+  Temperature of IF amplifier.
+
+time d [days]
+  Time "nominally UT1" as a Julian date. Marks the beginning
+  of each integration.
+
+tpower r[ntpower,nants] [V] [BIMA]
+  Total power measurements.
+
+trans r [K] [CARMA]
+  ?
+
+tscale r
+  Scale factor for correlations when they are stored as
+  j format.
+
+tsis r[nants] [K] [BIMA]
+  Temperature of SIS mixers.
+
+tsky r [K] [CARMA]
+  Sky temperature ... ?
+
+ut d [radians]
+  The time "nominally UT1" since midnight UT
+
+veldop r [km/s]
+  The sum of the radial velocity of the observatory (-> array center?)
+  in the direction of the source, with respect to the rest frame,
+  and the nominal systemic RV of the source. See also "veltype".
+
+veltype a
+  Velocity rest frame. Possible values are VELO-LSR: LSR ; 
+  VELO-HEL: barycenter; VELO-OBS: observatory; FELO-LSR: 
+  LSR in optical standard, deprecated; FELO-HEL:
+  barycenter in optical standard, deprecated.
+
+version a
+  Current hardware and software version. Interpretation depends on
+  telescope.
+
+vsource r [km/s]
+  Nominal radial systemic velocity of source. Positive is away from
+  the observer.
+
+wcorr c[nwide]
+  Wideband correlations. "The current ordering is: wcorr[0] and
+  wcorr[1] are digital LSB and USB ; wcorr[2] and wcorr[3] are
+  analog LSB and USB."
+
+wfreq r[nwide] [GHz]
+  Wideband correlation average frequencies.
+
+wind r [km/h] [ATCA]
+  Wind speed.
+
+winddir [r or a] [deg]
+  Wind direction: where the wind is blowing from. Originally 
+  (and deprecatedly) encoded as 'N', 'SE', etc.
+
+windmph r [mile/hr]
+  Wind speed.
+
+wsystemp [r or r[nants] or r[nwide,nants]] [K]
+  System temperature in wideband channels.
+
+wwidth r[nwide] [GHz]
+  Bandwidths of wideband correlation channels.
+
+xsampler r[nspect,nants,3] [percentage] [ATCA]
+  "X sampler statistics."
+
+xtsys r[nspect,nants] [K] [ATCA]
+  System temperature of the X feed. Not used in variance
+  calculations.
+
+xtsysm r[nspect,nants] [K] [ATCA]
+  ?
+
+xyamp r[nspect,nants] [Jy] [ATCA]
+  Online XY amplitude measurements.
+
+xyphase r[nspect,nants] [rad] [ATCA]
+  Online XY phase measurements.
+
+ysampler r[nspect,nants,3] [percentage] [ATCA]
+  "Y sampler statistics."
+
+ytsys r[nspect,nants] [K] [ATCA]
+  Analogous to xtsys.
+
+ytsysm r[nspect,nants] [K] [ATCA]
+  Analogous to ytsysm.

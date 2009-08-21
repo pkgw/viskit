@@ -1,0 +1,27 @@
+MIRIAD Mask Dataset Item Format
+===============================
+
+Abstract Definition
+-------------------
+
+A MIRIAD dataset (DS) item in "mask" format defines a sequence of
+binary values. Its precise semantics are context-dependent but it
+is generally used to flag visibility or image data.
+
+Item Format
+-----------
+
+A mask item is a large, i32-formatted MIRIAD DS item. It is
+therefore stored as a bytestream on disk in a MIRIAD DS.
+
+The first 4 bytes of a mask item are an item type identifier as
+described in "dataset.txt:Large Item Format". 
+
+The rest of the item is a sequence of i32s. Each i32 encodes 31 mask
+values in its low 31 bits, with the highest bit being unused. The
+final i32 is padded out with one bits as required. External
+information is needed to know precisely how many of those values
+encode valid information.
+
+No additional structure beyond the stream of binary values is defined
+by the format.

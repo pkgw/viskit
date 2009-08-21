@@ -1,0 +1,202 @@
+MIRIAD Dataset Format documentation
+===================================
+
+Abstract Definition
+-------------------
+
+A MIRIAD dataset (DS) is a flexible data storage format. It is
+logically composed of multiple named "items" of various types (int,
+string, binary blob, etc) and lengths. All of the meaning in a MIRIAD
+DS is derived from the types and values of the items it
+contains. Items are sometimes referred to as "headers" or "header
+variables" within MIRIAD. We eschew this confusing terminology.
+
+Item names are subject to the following constraints:
+ * Names must be composed of the characters a-z, 0-9, -, and _.
+ * Names must begin with a lower-case letter.
+ * Names must be between 1 and 8 characters in length.
+ * The name 'header' is forbidden.
+(MIRIAD implementation note: the name '.' has special semantics within
+MIRIAD, but it is forbidden by the above rules, so its meaning is not
+relevant here.)
+
+*** Standard items
+
+All DSs SHOULD contain a large textual item called "history" which
+records the creation and modification history of the data. The content
+is line-oriented, with lines appended to the file as tasks create or
+operate on the dataset.
+
+Each line usually begins with a capitalized version of the name of the
+task followed by a colon, a space, and informative text, e.g.:
+
+  PUTHD: Executed on: 02FEB21:14:31:43.0
+
+Standard MIRIAD tasks add lines with the folowing informative text to
+the history file:
+ * The task name (both as a prefix and in
+   the informative text) and version, in varying formats.
+ * Text of the form, "Executed on: YYMonDD:HH:MM:SS.S", as in
+   the example above.
+ * The text "Command line inputs follow:"
+ * One line for each command-line keyword input, indented by
+   two characters. The MIRIAD implementation truncates overlong
+   arguments.
+Zero or more further lines of task-specific output then follow.
+
+Although this convention is followed by most MIRIAD tasks, exceptions
+and inconsistencies occur. Care should be exercised if one is
+attempting to parse the history item.
+
+Data Types
+----------
+
+MIRIAD datasets are stored in big-endian format.
+
+Define N-bit signed integer types as iN (N can be more than one
+digit), unsigned integer types as uN, floating-point types as fN,
+complex types as cN. A complex type cN is stored as two adjacent
+floating-point values of (i.e., fM with M = N/2), the first being the
+real part, the second the imaginary.
+
+MIRIAD frequently uses certain standard names and abbreviations for
+certain types. These types are also given numerical codes that are
+used in various parts of the file format. The types also have
+alignment restrictions that are enforced at various points in the data
+format. These are given (measured in bits) below. (Every data type
+must be aligned to its size with the exception of the complex type.)
+
+ Type Align Abbr Code Name
+
+ i8   8     b    1    byte
+ i16  16    j    3    short
+ i32  32    i    2    int
+ i64  64    l    8    long (?)
+ f32  32    r    4    real
+ f64  64    d    5    double
+ c64  32    c    7    complex
+ text 8     a    6    text
+
+All text is ASCII-encoded in 8-bit characters.
+
+Filesystem Representation
+-------------------------
+
+A MIRIAD DS is encapsulated inside a filesystem directory. Large items
+are stored as files within this directory, with the filename being the
+name of the item. Small items are stored inside a special file
+"header", which the directory MUST contain. The "header" file does NOT
+correspond to a regular item. As mentioned above, a dataset is not
+allowed to contain an item named "header".
+
+The MIRIAD DS format intentionally underspecifies the contents of the
+DS directory. It is valid to create entries within the DS directory
+that are not specified by the DS format or that are not referred to in
+the DS data structures. "Files" within a DS may be symbolic links or
+other non-regular files, though such setups may create opportunities
+for mischief.
+
+Implementations that copy datasets SHOULD copy unrecognized DS
+directory entries as well as possible. The MIRIAD implementation does
+not do this.
+
+*** Header File Format
+
+The header file consists of a sequence of alternating table entries
+and data. Table entries are 16-byte records and are aligned on 16-byte
+boundaries. The first 15 bytes of the entry record the item name
+padded at the end with NUL bytes; the last byte is an i8 recording the
+size of the data in bytes. The size must be between 5 and 64
+(inclusive) or be zero. In the following discussion, denote the size
+of a record as S.
+
+Immediately after each table entry are the data corresponding to the
+entry. Zero-length items have no data record.
+
+The first 4 bytes of a data record the typecode of the data in an i4. 
+
+The next S-4 bytes of the data record store the actual data values,
+subject to alignment restrictions. If the offset of the byte
+immediately following the typecode (relative to the start of the file)
+is not aligned to the datatype's width, there are bytes to pad the
+data record until the appropriate alignment is reached. The padding
+SHOULD consiste of NUL bytes but the MIRIAD implementation writes
+indeterminate values. The number of values in the data item is thus
+
+Nvalues = (S - 4 - (4 % alignsize[type])) / itemsize[type] .
+
+Because table entries and data records are aligned to 16-byte offsets
+(see below) and the maximum alignment size is 8 bytes, the alignment
+of the byte following the typecode relative to the start of the file
+will always be 4. Thus the only datatypes that require padding bytes
+are the 64-bit ones.
+
+For instance, if the first record is of an item of type f64 with the
+name 'demo', the binary format of the table entry and data record are:
+
+(Byte order is left-to-right, up-to-down; data in hex.)
+64 65 6D 6F  # variable name (ASCII "demo")
+00 00 00 00  # padding
+00 00 00 00  # padding
+00 00 00 10  # padding & data size (= 16 bytes)
+00 00 00 05  # data typecode (f64)
+00 00 00 00  # alignment padding
+DD DD DD DD  # data value (bigendian IEEE 64-bit float)
+DD DD DD DD  # data value (bigendian IEEE 64-bit float)
+
+If the record is not the last record in the header and the file offset
+after the end of the data is not a multiple of 16 bytes, there are
+padding bytes to align the start of the next table entry to a multiple
+of 16 bytes. The padding SHOULD consist of NUL bytes but the MIRIAD
+implementation writes indeterminate values.
+
+For instance, if the first record is of an item of type i16 having three
+values and the name 'demo', the binary format of the table entry and
+data record are:
+
+64 65 6D 6F  # variable name (ASCII "demo")
+00 00 00 00  # padding
+
+00 00 00 00  # padding
+00 00 00 06  # padding & data size (= 6 bytes)
+
+00 00 00 03  # data typecode (i16)
+DD DD EE EE  # first and second data values.
+
+FF FF 00 00  # third data value & padding
+00 00 00 00  # padding
+
+Textual data are recorded with a type of i8, not "text". Such data
+cannot be assumed to be padded with a NUL after the last character, so
+care must be taken to terminate strings appropriately when reading
+them in from a header.
+
+*** Large Item Format
+
+A file containing a large item has a fairly freeform format. Such a
+file SHOULD be a least 64 bytes long. (If it is smaller than this, it
+can be recorded in the header file.) If this is the case, the first 4
+bytes of such an item are treated as an i32, called "T" below.
+
+If T = 1, 2, 3, 4, 5, 7, or 8, this is treated as a typecode.  The
+data are an array of the type designated by the typecode. The data
+begin at the first sufficiently-aligned location in the file -- i.e.,
+all types with an alignment value 4 bytes or smaller begin 4 bytes
+into the file and the rest begin at their alignment value.
+
+If T = 0, the data are assumed to be of mixed binary type. They begin
+immediately after the typecode marker.
+
+If T is none of these and the first 4 characters of the file are
+printable ASCII characters or ASCII spaces, the data are assumed to be
+ASCII text, and the first four bytes of the file are considered part
+of that text as well.
+
+The type of the file is indeterminate if any of the following are
+true:
+
+ * The file is fewer than 4 bytes long.
+ * T is none of the specified values but the first 4 bytes do not
+   indicate that the file is ASCII text.
+ * The file appears to be one of the datatypes, but the file size
+   would lead to a non-integral number of data values.
