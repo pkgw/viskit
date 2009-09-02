@@ -1,13 +1,18 @@
-bin_PROGRAMS = dsls
+AM_CFLAGS = $(GLOBALCFLAGS)
 
-dsls_SOURCES = \
+lib_LTLIBRARIES = libviskit.la
+
+libviskit_la_CFLAGS = $(GLOBALCFLAGS) $(GLIB_CFLAGS)
+libviskit_la_LIBADD = $(GLIB_LIBS)
+
+libviskit_la_SOURCES = \
  dataset.c \
  dataset.h \
- uvstream.c \
- uvstream.h
-
-# dsls.c
-
-dsls_CPPFLAGS = -I.
-dsls_CFLAGS = $(GLIB_CFLAGS)
-dsls_LDADD = $(GLIB_LIBS)
+ iostream.c \
+ iostream.h \
+ maskitem.c \
+ maskitem.h \
+ types.c \
+ types.h \
+ uvreader.c \
+ uvreader.h
