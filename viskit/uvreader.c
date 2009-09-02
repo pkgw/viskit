@@ -87,7 +87,7 @@ uvr_prep (UVReader *uvr, Dataset *ds, GError **err)
     gchar vtbuf[12]; /* char, space, 8 chars, newline, \0 */
     gchar *vtcur;
     int vtidx;
-    gsize nread;
+    gssize nread;
     UVVariable *var;
 
     uvr->vars_by_name = g_hash_table_new_full (g_str_hash, g_str_equal, 
@@ -163,6 +163,8 @@ uvr_prep (UVReader *uvr, Dataset *ds, GError **err)
     if (nread < 0)
 	goto bail;
 
+    close (vtab.fd);
+    vtab.fd = -1;
     io_uninit (&vtab);
 
     /* FIXME: check for vartable not ending in newline */
@@ -179,6 +181,8 @@ uvr_prep (UVReader *uvr, Dataset *ds, GError **err)
     return FALSE;
 
 bail:
+    if (vtab.fd >= 0)
+	close (vtab.fd);
     if (uvr->vd.fd >= 0)
 	close (uvr->vd.fd);
     if (uvr->fd.fd >= 0)
