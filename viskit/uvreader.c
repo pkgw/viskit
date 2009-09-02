@@ -39,7 +39,7 @@ typedef struct _UVVariable {
 struct _UVReader {
     Dataset *ds;
 
-    IOStream *vd; /* visdata */
+    IOStream vd; /* visdata */
 
     gint nvars;
     GHashTable *vars_by_name;
@@ -56,7 +56,7 @@ UVReader *
 uvr_open (Dataset *ds, GError **err)
 {
     UVReader *uvr;
-    IOStream *vtab;
+    IOStream vtab;
     gchar vtbuf[12]; /* char, space, 8 chars, newline, \0 */
     gchar *vtcur;
     int vtidx;
@@ -64,17 +64,20 @@ uvr_open (Dataset *ds, GError **err)
     UVVariable *var;
 
     uvr = g_new0 (UVReader, 1);
+    io_init (&(uvr->vd), 0);
+
     uvr->vars_by_name = g_hash_table_new_full (g_str_hash, g_str_equal, 
 					       NULL, 
 					       (GDestroyNotify) _uvv_free);
 
     /* Read in variable table */
 
-    if ((vtab = ds_open_large (ds, "vartable", DSM_READ, err)) == NULL)
+    io_init (&vtab, 0);
+    if (ds_open_large (ds, "vartable", DSM_READ, &vtab, err))
 	goto bail;
 
     vtidx = 0;
-    while ((nread = io_fetch (vtab, 1, &vtcur, err)) == 1) {
+    while ((nread = io_fetch (&vtab, 1, &vtcur, err)) == 1) {
 	if (*vtcur != '\n') {
 	    vtbuf[vtidx++] = *vtcur;
 
@@ -136,13 +139,13 @@ uvr_open (Dataset *ds, GError **err)
     if (nread < 0)
 	goto bail;
 
-    io_free (vtab);
+    io_uninit (&vtab);
 
     /* FIXME: check for vartable not ending in newline */
    
     /* Open visdata stream. FIXME: mode */
 
-    if ((uvr->vd = ds_open_large (ds, "visdata", DSM_READ, err)) == NULL)
+    if (ds_open_large (ds, "visdata", DSM_READ, &(uvr->vd), err))
 	goto bail;
 
     return uvr;
@@ -155,10 +158,7 @@ bail:
 void
 uvr_free (UVReader *uvr)
 {
-    if (uvr->vd != NULL) {
-	io_free (uvr->vd);
-	uvr->vd = NULL;
-    }
+    io_uninit (&(uvr->vd));
 
     if (uvr->vars_by_name != NULL) {
 	g_hash_table_destroy (uvr->vars_by_name);
@@ -181,7 +181,7 @@ uv_demo (Dataset *ds, GError **err)
     if ((uvr = uvr_open (ds, err)) == NULL)
 	return TRUE;
     
-    visdata = uvr->vd;
+    visdata = &(uvr->vd);
 
     while ((nread = io_fetch (visdata, HSZ, (gpointer) &header, err)) > 0) {
 	if (nread != HSZ)

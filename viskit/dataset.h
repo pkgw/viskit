@@ -34,7 +34,7 @@ extern void ds_close (Dataset *ds);
 extern gboolean ds_has_item (Dataset *ds, gchar *name);
 extern GSList *ds_list_items (Dataset *ds, GError **err)
     G_GNUC_WARN_UNUSED_RESULT;
-extern IOStream *ds_open_large (Dataset *ds, gchar *name, 
-				DSMode mode, GError **err);
+extern gboolean ds_open_large (Dataset *ds, gchar *name,
+			       DSMode mode, IOStream *io, GError **err);
 
 #endif

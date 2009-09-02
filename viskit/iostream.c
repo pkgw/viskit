@@ -12,6 +12,9 @@
 #include <unistd.h>
 
 
+#define DEFAULT_BUFSZ 4096
+
+
 /* Dealing with endianness conversion: MIRIAD datasets are
  * standardized to big-endian */
 
@@ -125,6 +128,9 @@ io_recode_data_inplace (gchar *data, DSType type, gsize nvals)
 void
 io_init (IOStream *io, gsize bufsz)
 {
+    if (bufsz == 0)
+	bufsz = DEFAULT_BUFSZ;
+
     /* bufsz must be a multiple of a large power of 2, say 256 ... */
     g_assert ((bufsz & 0xFF) == 0);
 

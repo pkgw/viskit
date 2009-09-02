@@ -13,8 +13,6 @@
 #include <stdio.h> /*printf*/
 
 
-#define BLOCKSZ 4096
-
 /* Note that these limits are set by the file format and MUST NOT be
  * changed by the user. Doing so will break compatibility with the
  * file format. */
@@ -77,7 +75,7 @@ Dataset *
 ds_open (const char *filename, DSMode mode, GError **err)
 {
     Dataset *ds;
-    IOStream *hio = NULL;
+    IOStream hio;
     GError *suberr;
     gsize nread;
     DSHeaderItem *hitem;
@@ -122,17 +120,11 @@ ds_open (const char *filename, DSMode mode, GError **err)
 
     /* Read in that thar header */
 
-    hio = io_alloc (BLOCKSZ);
-    _ds_set_name_item (ds, "header");
-    hio->fd = open (ds->namebuf, O_RDONLY);
-
-    if (hio->fd < 0) {
-	IO_ERRNO_ERRV (err, errno, "Failed to open header \"%s\"", 
-		       ds->namebuf);
+    io_init (&hio, 0);
+    if (ds_open_large (ds, "header", DSM_READ, &hio, err))
 	goto bail;
-    }
 
-    while ((nread = io_fetch (hio, DS_HEADER_RECSIZE, 
+    while ((nread = io_fetch (&hio, DS_HEADER_RECSIZE,
 			      (gchar **) &hitem, &suberr)) > 0) {
 	gchar *data;
 	gsize ndata;
@@ -178,7 +170,7 @@ ds_open (const char *filename, DSMode mode, GError **err)
 	    guint8 align;
 	    gsize dlen;
 
-	    ndata = io_fetch (hio, hitem->alen, &data, &suberr);
+	    ndata = io_fetch (&hio, hitem->alen, &data, &suberr);
 
 	    if (ndata < 0) {
 		g_propagate_error (err, suberr);
@@ -224,7 +216,7 @@ ds_open (const char *filename, DSMode mode, GError **err)
 	      dlen / ds_type_sizes[si->type]);*/
 	}
 
-	if (io_nudge_align (hio, DS_HEADER_RECSIZE, &suberr)) {
+	if (io_nudge_align (&hio, DS_HEADER_RECSIZE, &suberr)) {
 	    g_propagate_error (err, suberr);
 	    goto bail;
 	}
@@ -233,12 +225,10 @@ ds_open (const char *filename, DSMode mode, GError **err)
     return ds;
 
 bail:
-    if (hio->fd >= 0)
-	close (hio->fd);
+    if (hio.fd >= 0)
+	close (hio.fd);
 
-    if (hio != NULL)
-	io_free (hio);
-
+    io_uninit (&hio);
     ds_close (ds);
     return NULL;
 }
@@ -313,23 +303,23 @@ ds_list_items (Dataset *ds, GError **err)
     return items;
 }
 
-IOStream *
-ds_open_large (Dataset *ds, gchar *name, DSMode mode, GError **err)
+gboolean
+ds_open_large (Dataset *ds, gchar *name, DSMode mode, IOStream *io, GError **err)
 {
-    IOStream *io;
+    /* Note: this function is called in ds_open to read the header, so
+     * keep in mind that ds may not be fully initialized. */
 
+    g_return_val_if_fail (io != NULL, TRUE);
     g_assert (mode == DSM_READ); /* FIXME */
 
-    io = io_alloc (BLOCKSZ);
     _ds_set_name_item (ds, name);
     io->fd = open (ds->namebuf, O_RDONLY); /* FIXME */
 
     if (io->fd < 0) {
 	IO_ERRNO_ERRV (err, errno, "Failed to open item file \"%s\"",
 		       ds->namebuf);
-	io_free (io);
-	return NULL;
+	return TRUE;
     }
 
-    return io;
+    return FALSE;
 }

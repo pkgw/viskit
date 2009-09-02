@@ -5,7 +5,7 @@
 #include <maskitem.h>
 
 struct _MaskItem {
-    IOStream *stream;
+    IOStream stream;
     int bits_left_in_current;
     guint32 current_val;
 };
@@ -27,9 +27,9 @@ mask_open (Dataset *ds, gchar *name, DSMode mode, GError **err)
     MaskItem *mask;
 
     mask = g_new0 (MaskItem, 1);
+    io_init (&(mask->stream), 0);
 
-    mask->stream = ds_open_large (ds, name, mode, err);
-    if (mask->stream == NULL) {
+    if (ds_open_large (ds, name, mode, &(mask->stream), err)) {
 	mask_close (mask);
 	return NULL;
     }
@@ -42,11 +42,7 @@ mask_open (Dataset *ds, gchar *name, DSMode mode, GError **err)
 void
 mask_close (MaskItem *mask)
 {
-    if (mask->stream != NULL) {
-	io_free (mask->stream);
-	mask->stream = NULL;
-    }
-
+    io_uninit (&(mask->stream));
     g_free (mask);
 }
 
@@ -88,7 +84,7 @@ mask_read_expand (MaskItem *mask, gchar *dest, gsize nbits, GError **err)
 
 	/* We need to read in another i32. */
 
-	nread = io_fetch (mask->stream, 4, &bufptr, err);
+	nread = io_fetch (&(mask->stream), 4, &bufptr, err);
 
 	if (nread < 0)
 	    return TRUE;
