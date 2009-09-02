@@ -9,9 +9,9 @@ typedef struct _IOStream IOStream;
 
 /* Dealing with endianness conversions */
 
-#define IO_RECODE_I16(buf) GINT16_FROM_BE (*buf)
-#define IO_RECODE_I32(buf) GINT32_FROM_BE (*buf)
-#define IO_RECODE_I64(buf) GINT64_FROM_BE (*buf)
+#define IO_RECODE_I16(buf) GINT16_FROM_BE (*((guint16 *)buf))
+#define IO_RECODE_I32(buf) GINT32_FROM_BE (*((guint32 *)buf))
+#define IO_RECODE_I64(buf) GINT64_FROM_BE (*((guint64 *)buf))
 
 extern void io_recode_data_copy (gchar *src, gchar *dest, 
 				 DSType type, gsize nvals);
