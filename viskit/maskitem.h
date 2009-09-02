@@ -1,5 +1,5 @@
-#ifndef _MASKITEM_H
-#define _MASKITEM_H
+#ifndef _VISKIT_MASKITEM_H
+#define _VISKIT_MASKITEM_H
 
 #include <viskit/dataset.h>
 

@@ -1,5 +1,5 @@
-#ifndef _UVREADER_H
-#define _UVREADER_H
+#ifndef _VISKIT_UVREADER_H
+#define _VISKIT_UVREADER_H
 
 #include <viskit/dataset.h>
 

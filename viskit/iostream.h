@@ -1,5 +1,5 @@
-#ifndef _IOSTREAM_H
-#define _IOSTREAM_H
+#ifndef _VISKIT_IOSTREAM_H
+#define _VISKIT_IOSTREAM_H
 
 #include <glib.h>
 #include <viskit/types.h>

@@ -1,5 +1,5 @@
-#ifndef _DATASET_H
-#define _DATASET_H
+#ifndef _VISKIT_DATASET_H
+#define _VISKIT_DATASET_H
 
 #include <glib.h>
 #include <viskit/iostream.h>

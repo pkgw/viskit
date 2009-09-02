@@ -1,5 +1,5 @@
-#ifndef _TYPES_H
-#define _TYPES_H
+#ifndef _VISKIT_TYPES_H
+#define _VISKIT_TYPES_H
 
 #include <glib.h>
 
