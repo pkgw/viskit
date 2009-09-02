@@ -2,7 +2,7 @@ AM_CFLAGS = $(GLOBALCFLAGS)
 
 lib_LTLIBRARIES = libviskit.la
 
-libviskit_la_CFLAGS = $(GLOBALCFLAGS) $(GLIB_CFLAGS)
+libviskit_la_CFLAGS = -I$(top_srcdir) $(GLOBALCFLAGS) $(GLIB_CFLAGS)
 libviskit_la_LIBADD = $(GLIB_LIBS)
 
 libviskit_la_SOURCES = \

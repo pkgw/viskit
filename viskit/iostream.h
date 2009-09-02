@@ -2,7 +2,7 @@
 #define _IOSTREAM_H
 
 #include <glib.h>
-#include <types.h>
+#include <viskit/types.h>
 
 typedef struct _IOStream IOStream;
 

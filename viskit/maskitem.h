@@ -1,7 +1,7 @@
 #ifndef _MASKITEM_H
 #define _MASKITEM_H
 
-#include <dataset.h>
+#include <viskit/dataset.h>
 
 typedef struct _MaskItem MaskItem;
 

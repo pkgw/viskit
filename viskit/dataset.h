@@ -2,7 +2,7 @@
 #define _DATASET_H
 
 #include <glib.h>
-#include <iostream.h>
+#include <viskit/iostream.h>
 
 typedef struct _Dataset Dataset;
 
