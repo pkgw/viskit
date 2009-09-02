@@ -4,6 +4,8 @@
 
 #include <maskitem.h>
 
+#include <unistd.h>
+
 struct _MaskItem {
     IOStream stream;
     int bits_left_in_current;
@@ -42,6 +44,11 @@ mask_open (Dataset *ds, gchar *name, DSMode mode, GError **err)
 void
 mask_close (MaskItem *mask)
 {
+    if (mask->stream.fd >= 0) {
+	close (mask->stream.fd);
+	mask->stream.fd = -1;
+    }
+
     io_uninit (&(mask->stream));
     g_free (mask);
 }
