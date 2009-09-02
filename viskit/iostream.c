@@ -139,6 +139,8 @@ io_init (IOStream *io, gsize bufsz)
     io->rbuf = g_new (gchar, bufsz * 3); /* Allocate the three buffers all as one block. */
     io->wbuf = io->rbuf + bufsz;
     io->scratch = io->wbuf + bufsz;
+    io->wpos = io->reof = 0;
+    io->wend = io->rend = 0;
     io->rpos = bufsz; /* Forces a block to be read on first fetch */
 }
 
