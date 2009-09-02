@@ -1,4 +1,4 @@
-#include <uvstream.h>
+#include <uvreader.h>
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -78,17 +78,26 @@ uvr_open (Dataset *ds, GError **err)
 	if (*vtcur != '\n') {
 	    vtbuf[vtidx++] = *vtcur;
 
-	    if (vtidx >= 12)
-		g_error ("Invalid vartable format!");
+	    if (vtidx >= 12) {
+		g_set_error (err, DS_ERROR, DS_ERROR_FORMAT,
+			     "Invalid UV vartable: too-long variable name");
+		goto bail;
+	    }
 
 	    continue;
 	}
 
-	if (vtidx < 3)
-	    g_error ("Invalid vartable format!");
+	if (vtidx < 3) {
+	    g_set_error (err, DS_ERROR, DS_ERROR_FORMAT,
+			 "Invalid UV vartable: no variable name");
+	    goto bail;
+	}
 
-	if (vtbuf[1] != ' ')
-	    g_error ("Invalid vartable format!");
+	if (vtbuf[1] != ' ') {
+	    g_set_error (err, DS_ERROR, DS_ERROR_FORMAT,
+			 "Invalid UV vartable: bad variable typename");
+	    goto bail;
+	}
 
 	var = g_new0 (UVVariable, 1);
 	vtbuf[vtidx] = '\0';
@@ -103,7 +112,9 @@ uvr_open (Dataset *ds, GError **err)
 	case 'c': var->type = DST_C64; break;
 	case 'a': var->type = DST_TEXT; break;
 	default:
-	    g_error ("Invalid vartable format!");
+	    g_set_error (err, DS_ERROR, DS_ERROR_FORMAT,
+			 "Invalid UV vartable: unknown variable typename");
+	    goto bail;
 	}
 
 	strcpy (var->name, vtbuf + 2);
@@ -113,8 +124,11 @@ uvr_open (Dataset *ds, GError **err)
 	uvr->vars[uvr->nvars++] = var;
 	g_hash_table_insert (uvr->vars_by_name, var->name, var);
 
-	if (uvr->nvars >= NUMVARS)
-	    g_error ("Invalid vartable format!");
+	if (uvr->nvars >= NUMVARS) {
+	    g_set_error (err, DS_ERROR, DS_ERROR_FORMAT,
+			 "Invalid UV vartable: too many variables");
+	    goto bail;
+	}
 
 	vtidx = 0;
     }
@@ -126,7 +140,7 @@ uvr_open (Dataset *ds, GError **err)
 
     /* FIXME: check for vartable not ending in newline */
    
-    /* Open visdata stream */
+    /* Open visdata stream. FIXME: mode */
 
     if ((uvr->vd = ds_open_large (ds, "visdata", DSM_READ, err)) == NULL)
 	goto bail;
@@ -185,7 +199,7 @@ uv_demo (Dataset *ds, GError **err)
 	    if (io_fetch (visdata, 4, &buf, err) != 4)
 		return TRUE;
 
-	    var->nvalues = io_decode_i32 (buf);
+	    var->nvalues = IO_RECODE_I32 (buf);
 
 	    if (var->nvalues % ds_type_sizes[var->type] != 0)
 		g_error ("uneven # of elements");
@@ -199,7 +213,7 @@ uv_demo (Dataset *ds, GError **err)
 
 	    var = uvr->vars[header->var];
 
-	    if (io_read_align (visdata, ds_type_aligns[var->type], err))
+	    if (io_nudge_align (visdata, ds_type_aligns[var->type], err))
 		return TRUE;
 	    if (io_fetch (visdata, var->nvalues, &buf, err) != var->nvalues)
 		return TRUE;
@@ -212,7 +226,7 @@ uv_demo (Dataset *ds, GError **err)
 	    g_error ("invalid format!");
 	}
 
-	if (io_read_align (visdata, VISDATA_ALIGN, err))
+	if (io_nudge_align (visdata, VISDATA_ALIGN, err))
 	    return TRUE;
     }
 

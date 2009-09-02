@@ -1,5 +1,5 @@
-#ifndef _UVSTREAM_H
-#define _UVSTREAM_H
+#ifndef _UVREADER_H
+#define _UVREADER_H
 
 #include <dataset.h>
 
