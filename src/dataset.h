@@ -2,6 +2,7 @@
 #define _DATASET_H
 
 #include <glib.h>
+#include <iostream.h>
 
 typedef struct _Dataset Dataset;
 
@@ -12,42 +13,25 @@ typedef enum _DSMode {
     DSM_APPEND = 3, /* not valid for whole datasets */
 } DSMode;
 
-typedef enum _DSType {
-    DST_UNK  = 0, /* not an actual type used in the file format */
-    DST_I8   = 1,
-    DST_I32  = 2,
-    DST_I16  = 3,
-    DST_F32  = 4,
-    DST_F64  = 5,
-    DST_TEXT = 6, /* written as DST_I8 in the file format */
-    DST_C64  = 7,
-    DST_I64  = 8
-} DSType;
 
-#define DST_VALID(v) ((v) > 0 && (v) < 9)
+/* Custom errors */
 
-extern const char ds_type_codes[];
-extern const guint8 ds_type_sizes[];
-extern const guint8 ds_type_aligns[];
+#define DS_ERROR ds_error_quark ()
 
-/* IO on large dataset items */
+extern GQuark ds_error_quark (void);
 
-typedef struct _IOStream IOStream;
+typedef enum _DSError {
+    DS_ERROR_FORMAT = 0
+} DSError;
 
-extern void io_free (IOStream *io);
-extern gssize io_fetch (IOStream *io, gsize nbytes, gchar **dest,
-		       GError **err);
-extern gboolean io_read_align (IOStream *io, gsize align_size, 
-			       GError **err);
 
-gint16 io_decode_i16 (gchar *buf);
-gint32 io_decode_i32 (gchar *buf);
-gint64 io_decode_i64 (gchar *buf);
+/* Dataset access */
 
-/* Prototypes */
-
-extern Dataset *ds_open (const char *filename, DSMode mode, GError **err);
+extern Dataset *ds_open (const char *filename, DSMode mode, GError **err)
+    G_GNUC_WARN_UNUSED_RESULT;
 extern void ds_close (Dataset *ds);
+
+extern gboolean ds_has_item (Dataset *ds, gchar *name);
 extern GSList *ds_list_items (Dataset *ds, GError **err)
     G_GNUC_WARN_UNUSED_RESULT;
 extern IOStream *ds_open_large (Dataset *ds, gchar *name, 
