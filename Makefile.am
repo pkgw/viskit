@@ -1,1 +1,1 @@
-SUBDIRS = viskit
+SUBDIRS = viskit demo

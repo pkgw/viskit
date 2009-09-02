@@ -19,6 +19,7 @@ AC_SUBST([GLIB_LIBS])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([
 Makefile
+demo/Makefile
 viskit/Makefile
 ])
 
