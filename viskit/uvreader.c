@@ -18,7 +18,7 @@ typedef struct _UVVariable {
     gchar name[9];
     guint8 ident;
     DSType type;
-    gssize nbytes;
+    gssize nelems;
 } UVVariable;
 
 #define HSZ (sizeof (UVHeader))
@@ -143,7 +143,7 @@ uvr_prep (UVReader *uvr, Dataset *ds, GError **err)
 
 	strcpy (var->name, vtbuf + 2);
 	var->ident = uvr->nvars;
-	var->nbytes = -1;
+	var->nelems = -1;
 
 	uvr->vars[uvr->nvars++] = var;
 	g_hash_table_insert (uvr->vars_by_name, var->name, var);
@@ -194,6 +194,7 @@ uvr_next (UVReader *uvr, gchar **data, GError **err)
     gsize nread;
     gchar *buf;
     UVVariable *var;
+    gint32 nbytes;
 
     *data = NULL;
     nread = io_fetch (&(uvr->vd), HSZ, (gpointer) &header, err);
@@ -227,14 +228,15 @@ uvr_next (UVReader *uvr, gchar **data, GError **err)
 	    return UVET_ERROR;
 	}
 
-	var->nbytes = IO_RECODE_I32 (buf);
+	nbytes = IO_RECODE_I32 (buf);
 
-	if (var->nbytes % ds_type_sizes[var->type] != 0) {
+	if (nbytes % ds_type_sizes[var->type] != 0) {
 	    g_set_error (err, DS_ERROR, DS_ERROR_FORMAT,
 			 "Invalid UV visdata: illegal entry size");
 	    return UVET_ERROR;
 	}
 
+	var->nelems = nbytes / ds_type_sizes[var->type];
 	*data = (gchar *) var;
 	break;
     case UVET_DATA:
@@ -249,10 +251,12 @@ uvr_next (UVReader *uvr, gchar **data, GError **err)
 	if (io_nudge_align (&(uvr->vd), ds_type_aligns[var->type], err))
 	    return UVET_ERROR;
 
-	if ((nread = io_fetch (&(uvr->vd), var->nbytes, &buf, err)) < 0)
+	nbytes = var->nelems * ds_type_sizes[var->type];
+
+	if ((nread = io_fetch (&(uvr->vd), nbytes, &buf, err)) < 0)
 	    return UVET_ERROR;
 
-	if (nread != var->nbytes) {
+	if (nread != nbytes) {
 	    g_set_error (err, DS_ERROR, DS_ERROR_FORMAT,
 			 "Invalid UV visdata: truncated variable data");
 	    return UVET_ERROR;
