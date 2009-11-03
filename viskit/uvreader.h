@@ -13,6 +13,13 @@ typedef enum _UVEntryType {
     UVET_ERROR = -1 /* ditto */
 } UVEntryType;
 
+typedef struct _UVVariable {
+    gchar name[9];
+    guint8 ident;
+    DSType type;
+    gssize nvals;
+    gchar *data;
+} UVVariable;
 
 extern UVReader *uvr_alloc (void);
 extern void uvr_free (UVReader *uvr);

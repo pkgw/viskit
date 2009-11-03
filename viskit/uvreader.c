@@ -14,14 +14,6 @@ typedef struct _UVHeader {
     guint8 pad2;
 } UVHeader;
 
-typedef struct _UVVariable {
-    gchar name[9];
-    guint8 ident;
-    DSType type;
-    gssize nvals;
-    gchar *data;
-} UVVariable;
-
 #define HSZ (sizeof (UVHeader))
 #define VISDATA_ALIGN 8
 
