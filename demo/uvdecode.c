@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <glib.h>
 #include <viskit/uvreader.h>
 
 int
@@ -7,7 +8,8 @@ main (int argc, char **argv)
     Dataset *ds;
     UVReader *uvr;
     UVEntryType uvet;
-    gchar *uvdata;
+    UVVariable *var;
+    gchar *uvdata, *buf;
     GError *err = NULL;
 
     if (argc != 2) {
@@ -37,16 +39,20 @@ main (int argc, char **argv)
 		     argv[1], err->message);
 	    return 1;
 	case UVET_SIZE:
-	    printf ("size\n");
+	    var = (UVVariable *) uvdata;
+	    printf ("%s.nval = %li\n", var->name, (long int) var->nvals);
 	    break;
 	case UVET_DATA:
-	    printf ("data\n");
+	    var = (UVVariable *) uvdata;
+	    buf = ds_type_format (var->data, var->type, var->nvals);
+	    printf ("%s.data = %s\n", var->name, buf);
+	    g_free (buf);
 	    break;
 	case UVET_EOR:
-	    printf ("EOR\n");
+	    printf ("-- EOR --\n");
 	    break;
 	case UVET_EOS:
-	    printf ("EOS\n");
+	    printf ("-- EOS --\n");
 	    break;
 	}
 
