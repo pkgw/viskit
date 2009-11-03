@@ -19,6 +19,7 @@ typedef struct _UVVariable {
     guint8 ident;
     DSType type;
     gssize nelems;
+    gchar *data;
 } UVVariable;
 
 #define HSZ (sizeof (UVHeader))
@@ -39,8 +40,15 @@ struct _UVReader {
     UVVariable *vars[NUMVARS];
 };
 
-/* Free uv-variable data -- right now can just call g_free */
-#define _uvv_free g_free
+
+static void
+_uvv_free (UVVariable *uvv)
+{
+    if (uvv->data != NULL)
+	g_free (uvv->data);
+    g_free (uvv);
+}
+
 
 UVReader *
 uvr_alloc (void)
@@ -144,6 +152,7 @@ uvr_prep (UVReader *uvr, Dataset *ds, GError **err)
 	strcpy (var->name, vtbuf + 2);
 	var->ident = uvr->nvars;
 	var->nelems = -1;
+	var->data = NULL;
 
 	uvr->vars[uvr->nvars++] = var;
 	g_hash_table_insert (uvr->vars_by_name, var->name, var);
@@ -237,6 +246,8 @@ uvr_next (UVReader *uvr, gchar **data, GError **err)
 	}
 
 	var->nelems = nbytes / ds_type_sizes[var->type];
+	var->data = g_realloc (var->data, nbytes);
+
 	*data = (gchar *) var;
 	break;
     case UVET_DATA:
@@ -253,6 +264,9 @@ uvr_next (UVReader *uvr, gchar **data, GError **err)
 
 	nbytes = var->nelems * ds_type_sizes[var->type];
 
+	/* FIXME: cannot read in variables larger than the UV-reader
+	 * buffer size! */
+
 	if ((nread = io_fetch (&(uvr->vd), nbytes, &buf, err)) < 0)
 	    return UVET_ERROR;
 
@@ -262,7 +276,8 @@ uvr_next (UVReader *uvr, gchar **data, GError **err)
 	    return UVET_ERROR;
 	}
 
-	/* XXX big ol' hack: not actually doing anything with the data ... */
+	io_recode_data_copy (buf, var->data, var->type, var->nelems);
+
 	*data = (gchar *) var;
 	break;
     case UVET_EOR:
