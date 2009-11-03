@@ -256,7 +256,7 @@ uvr_next (UVReader *uvr, gchar **data, GError **err)
 
 	nbytes = var->nvals * ds_type_sizes[var->type];
 
-	/* FIXME: cannot read in variables larger than the UV-reader
+	/* FIXME: cannot read in variables larger than the IO stream
 	 * buffer size! */
 
 	if ((nread = io_fetch (&(uvr->vd), nbytes, &buf, err)) < 0)
