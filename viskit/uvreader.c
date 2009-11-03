@@ -18,7 +18,7 @@ typedef struct _UVVariable {
     gchar name[9];
     guint8 ident;
     DSType type;
-    gssize nelems;
+    gssize nvals;
     gchar *data;
 } UVVariable;
 
@@ -151,7 +151,7 @@ uvr_prep (UVReader *uvr, Dataset *ds, GError **err)
 
 	strcpy (var->name, vtbuf + 2);
 	var->ident = uvr->nvars;
-	var->nelems = -1;
+	var->nvals = -1;
 	var->data = NULL;
 
 	uvr->vars[uvr->nvars++] = var;
@@ -245,7 +245,7 @@ uvr_next (UVReader *uvr, gchar **data, GError **err)
 	    return UVET_ERROR;
 	}
 
-	var->nelems = nbytes / ds_type_sizes[var->type];
+	var->nvals = nbytes / ds_type_sizes[var->type];
 	var->data = g_realloc (var->data, nbytes);
 
 	*data = (gchar *) var;
@@ -262,7 +262,7 @@ uvr_next (UVReader *uvr, gchar **data, GError **err)
 	if (io_nudge_align (&(uvr->vd), ds_type_aligns[var->type], err))
 	    return UVET_ERROR;
 
-	nbytes = var->nelems * ds_type_sizes[var->type];
+	nbytes = var->nvals * ds_type_sizes[var->type];
 
 	/* FIXME: cannot read in variables larger than the UV-reader
 	 * buffer size! */
@@ -276,7 +276,7 @@ uvr_next (UVReader *uvr, gchar **data, GError **err)
 	    return UVET_ERROR;
 	}
 
-	io_recode_data_copy (buf, var->data, var->type, var->nelems);
+	io_recode_data_copy (buf, var->data, var->type, var->nvals);
 
 	*data = (gchar *) var;
 	break;
