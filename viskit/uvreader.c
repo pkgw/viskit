@@ -39,11 +39,8 @@ struct _UVReader {
     UVVariable *vars[NUMVARS];
 };
 
-static void
-_uvv_free (UVVariable *var)
-{
-    g_free (var);
-}
+/* Free uv-variable data -- right now can just call g_free */
+#define _uvv_free g_free
 
 UVReader *
 uvr_alloc (void)
