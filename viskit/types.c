@@ -17,3 +17,75 @@ const guint8 ds_type_aligns[] = {
      * of its constituents. */
     0, 1, 4, 2, 4, 8, 1, 4, 8
 };
+
+static const gchar *_ds_type_formats[] = {
+    "?", "%hhd", "%" G_GINT32_FORMAT, "%" G_GINT16_FORMAT,
+    "%g", "%g", NULL, "%g%+gi", "%" G_GINT64_FORMAT
+};
+
+gchar *
+ds_type_format (gchar *data, DSType type, gssize nvals)
+{
+    GString *s;
+    const gchar *fmt;
+    gssize i;
+    double d1, d2;
+
+    g_assert (nvals >= 0);
+
+    if (nvals == 0)
+	return g_strdup ("<>");
+
+    if (type == DST_TEXT)
+	return g_strdup_printf ("\"%.*s\"", nvals, data);
+
+    s = g_string_new ("");
+
+    if (nvals > 1)
+	g_string_append_c (s, '[');
+
+    fmt = _ds_type_formats[type];
+
+    for (i = 0; i < nvals; i++) {
+	if (i > 0)
+	    g_string_append (s, ", ");
+
+	switch (type) {
+	case DST_UNK:
+	    g_string_append (s, fmt);
+	    break;
+	case DST_I8:
+	    g_string_append_printf (s, fmt, *(gint8 *) data);
+	    break;
+	case DST_I16:
+	    g_string_append_printf (s, fmt, *(gint16 *) data);
+	    break;
+	case DST_I32:
+	    g_string_append_printf (s, fmt, *(gint32 *) data);
+	    break;
+	case DST_I64:
+	    g_string_append_printf (s, fmt, *(gint64 *) data);
+	    break;
+	case DST_F32:
+	    g_string_append_printf (s, fmt, (double) (*(float *) data));
+	    break;
+	case DST_F64:
+	    g_string_append_printf (s, fmt, *(double *) data);
+	    break;
+	case DST_C64:
+	    d1 = (double) (*(float *) data);
+	    d2 = (double) (*(float *) (data + 4));
+	    g_string_append_printf (s, fmt, d1, d2);
+	    break;
+	default:
+	    g_assert_not_reached ();
+	}
+
+	data += ds_type_sizes[type];
+    }
+
+    if (nvals > 1)
+	g_string_append_c (s, ']');
+
+    return g_string_free (s, FALSE);
+}
