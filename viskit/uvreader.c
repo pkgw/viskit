@@ -25,7 +25,7 @@ typedef struct _UVHeader {
 
 struct _UVReader {
     IOStream vd; /* visdata */
-    IOStream fd; /* flag data */
+    IOStream sfd; /* spectral flag data */
 
     gint nvars;
     GHashTable *vars_by_name;
@@ -49,7 +49,7 @@ uvr_alloc (void)
 
     uvr = g_new0 (UVReader, 1);
     io_init (&(uvr->vd), 0);
-    io_init (&(uvr->fd), 0);
+    io_init (&(uvr->sfd), 0);
     return uvr;
 }
 
@@ -61,13 +61,13 @@ uvr_free (UVReader *uvr)
 	uvr->vd.fd = -1;
     }
 
-    if (uvr->fd.fd >= 0) {
-	close (uvr->fd.fd);
-	uvr->fd.fd = -1;
+    if (uvr->sfd.fd >= 0) {
+	close (uvr->sfd.fd);
+	uvr->sfd.fd = -1;
     }
 
     io_uninit (&(uvr->vd));
-    io_uninit (&(uvr->fd));
+    io_uninit (&(uvr->sfd));
 
     if (uvr->vars_by_name != NULL) {
 	g_hash_table_destroy (uvr->vars_by_name);
@@ -173,7 +173,7 @@ uvr_prep (UVReader *uvr, Dataset *ds, GError **err)
 
     if (ds_open_large (ds, "visdata", DSM_READ, &(uvr->vd), err))
 	goto bail;
-    if (ds_open_large (ds, "flags", DSM_READ, &(uvr->fd), err))
+    if (ds_open_large (ds, "flags", DSM_READ, &(uvr->sfd), err))
 	goto bail;
 
     return FALSE;
@@ -183,8 +183,8 @@ bail:
 	close (vtab.fd);
     if (uvr->vd.fd >= 0)
 	close (uvr->vd.fd);
-    if (uvr->fd.fd >= 0)
-	close (uvr->fd.fd);
+    if (uvr->sfd.fd >= 0)
+	close (uvr->sfd.fd);
     return TRUE;
 }
 
