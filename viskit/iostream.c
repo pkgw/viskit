@@ -13,7 +13,7 @@
 #include <string.h> /*memcpy*/
 
 
-#define DEFAULT_BUFSZ 4096
+#define DEFAULT_BUFSZ 16384
 
 
 /* Dealing with endianness conversion: MIRIAD datasets are
@@ -344,7 +344,16 @@ io_fetch_prealloc (IOStream *io, DSType type, gsize nvals, gpointer buf,
     io->rpos += ninbuf;
 
     /* If we need to read more, do so, reading directly into the
-     * caller's buffer. */
+     * caller's buffer.
+     *
+     * FIXME: doing this causes us to lose our nice block-aligned
+     * read behavior, and tests indicate that doing so can indeed
+     * cause a massive performance hit. For now, we make the default
+     * buffer size big enough for that not to be a problem for UV
+     * variables, but if we have million-point spectra, the problem
+     * will arise in the future. We could do block-aligned reads into
+     * the user buffer, do a final read into the IO buffer again,
+     * then copy the last bit of data into the caller's buffer. */
 
     if (ninbuf < nbytes) {
 	gsize ntoread = nbytes - ninbuf;
