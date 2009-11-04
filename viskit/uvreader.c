@@ -254,21 +254,15 @@ uvr_next (UVReader *uvr, gchar **data, GError **err)
 	if (io_nudge_align (&(uvr->vd), ds_type_aligns[var->type], err))
 	    return UVET_ERROR;
 
-	nbytes = var->nvals * ds_type_sizes[var->type];
-
-	/* FIXME: cannot read in variables larger than the IO stream
-	 * buffer size! */
-
-	if ((nread = io_fetch (&(uvr->vd), nbytes, &buf, err)) < 0)
+	if ((nread = io_fetch_prealloc (&(uvr->vd), var->type, var->nvals,
+					var->data, err)) < 0)
 	    return UVET_ERROR;
 
-	if (nread != nbytes) {
+	if (nread != var->nvals) {
 	    g_set_error (err, DS_ERROR, DS_ERROR_FORMAT,
 			 "Invalid UV visdata: truncated variable data");
 	    return UVET_ERROR;
 	}
-
-	io_recode_data_copy (buf, var->data, var->type, var->nvals);
 
 	*data = (gchar *) var;
 	break;
