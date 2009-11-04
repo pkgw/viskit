@@ -8,7 +8,7 @@ typedef struct _MaskItem MaskItem;
 extern MaskItem *mask_open (Dataset *ds, gchar *name, DSMode mode, GError **err);
 extern void mask_close (MaskItem *mask);
 
-extern gboolean mask_read_expand (MaskItem *mask, gchar *dest, gsize nbits, 
+extern gboolean mask_read_expand (MaskItem *mask, guint8 *dest, gsize nbits,
 				  GError **err);
 
 #endif

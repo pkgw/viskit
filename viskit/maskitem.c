@@ -54,7 +54,7 @@ mask_close (MaskItem *mask)
 }
 
 gboolean
-mask_read_expand (MaskItem *mask, gchar *dest, gsize nbits, GError **err)
+mask_read_expand (MaskItem *mask, guint8 *dest, gsize nbits, GError **err)
 {
     int i;
     gsize toread;
