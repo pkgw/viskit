@@ -192,6 +192,8 @@ UVEntryType
 uvr_next (UVReader *uvr, gchar **data, GError **err)
 {
     UVHeader *header;
+    UVEntryType etype;
+    guint8 varnum;
     gsize nread;
     gchar *buf;
     UVVariable *var;
@@ -210,15 +212,21 @@ uvr_next (UVReader *uvr, gchar **data, GError **err)
 	return UVET_ERROR;
     }
 
-    switch (header->etype) {
+    etype = header->etype;
+    varnum = header->var;
+    /* Don't use header after this point because it may be
+     * destroyed when doing the I/O to read in the subsequent
+     * pieces of data. */
+
+    switch (etype) {
     case UVET_SIZE:
-	if (header->var >= NUMVARS) {
+	if (varnum >= NUMVARS) {
 	    g_set_error (err, DS_ERROR, DS_ERROR_FORMAT,
 			 "Invalid UV visdata: illegal variable number");
 	    return UVET_ERROR;
 	}
 
-	var = uvr->vars[header->var];
+	var = uvr->vars[varnum];
 
 	if ((nread = io_fetch_temp (&(uvr->vd), 4, &buf, err)) < 0)
 	    return UVET_ERROR;
@@ -243,13 +251,13 @@ uvr_next (UVReader *uvr, gchar **data, GError **err)
 	*data = (gchar *) var;
 	break;
     case UVET_DATA:
-	if (header->var >= NUMVARS) {
+	if (varnum >= NUMVARS) {
 	    g_set_error (err, DS_ERROR, DS_ERROR_FORMAT,
 			 "Invalid UV visdata: illegal variable number");
 	    return UVET_ERROR;
 	}
 
-	var = uvr->vars[header->var];
+	var = uvr->vars[varnum];
 
 	if (io_nudge_align (&(uvr->vd), ds_type_aligns[var->type], err))
 	    return UVET_ERROR;
@@ -271,12 +279,12 @@ uvr_next (UVReader *uvr, gchar **data, GError **err)
     default:
 	g_set_error (err, DS_ERROR, DS_ERROR_FORMAT,
 		     "Invalid UV visdata: unknown record type %d",
-		     header->etype);
+		     etype);
 	return UVET_ERROR;
     }
 
     if (io_nudge_align (&(uvr->vd), VISDATA_ALIGN, err))
 	return UVET_ERROR;
 
-    return header->etype;
+    return etype;
 }
