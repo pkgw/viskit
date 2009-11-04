@@ -91,7 +91,7 @@ mask_read_expand (MaskItem *mask, gchar *dest, gsize nbits, GError **err)
 
 	/* We need to read in another i32. */
 
-	nread = io_fetch (&(mask->stream), 4, &bufptr, err);
+	nread = io_fetch_temp (&(mask->stream), 4, &bufptr, err);
 
 	if (nread < 0)
 	    return TRUE;

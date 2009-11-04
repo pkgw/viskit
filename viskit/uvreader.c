@@ -98,7 +98,7 @@ uvr_prep (UVReader *uvr, Dataset *ds, GError **err)
 	goto bail;
 
     vtidx = 0;
-    while ((nread = io_fetch (&vtab, 1, &vtcur, err)) == 1) {
+    while ((nread = io_fetch_temp (&vtab, 1, &vtcur, err)) == 1) {
 	if (*vtcur != '\n') {
 	    vtbuf[vtidx++] = *vtcur;
 
@@ -198,7 +198,7 @@ uvr_next (UVReader *uvr, gchar **data, GError **err)
     gint32 nbytes;
 
     *data = NULL;
-    nread = io_fetch (&(uvr->vd), HSZ, (gpointer) &header, err);
+    nread = io_fetch_temp (&(uvr->vd), HSZ, (gpointer) &header, err);
 
     if (nread < 0)
 	return UVET_ERROR;
@@ -220,7 +220,7 @@ uvr_next (UVReader *uvr, gchar **data, GError **err)
 
 	var = uvr->vars[header->var];
 
-	if ((nread = io_fetch (&(uvr->vd), 4, &buf, err)) < 0)
+	if ((nread = io_fetch_temp (&(uvr->vd), 4, &buf, err)) < 0)
 	    return UVET_ERROR;
 
 	if (nread != 4) {

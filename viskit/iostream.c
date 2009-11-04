@@ -212,7 +212,7 @@ _io_read (IOStream *io, GError **err)
 }
 
 gssize
-io_fetch (IOStream *io, gsize nbytes, gchar **dest, GError **err)
+io_fetch_temp (IOStream *io, gsize nbytes, gchar **dest, GError **err)
 {
     /* disallow this situation for now. */
     g_assert (nbytes <= io->bufsz);
@@ -248,7 +248,7 @@ io_fetch (IOStream *io, gsize nbytes, gchar **dest, GError **err)
 	if (_io_read (io, err))
 	    return -1;
 
-	return io_fetch (io, nbytes, dest, err);
+	return io_fetch_temp (io, nbytes, dest, err);
     }
 
     if (io->rpos + nbytes <= io->bufsz) {
@@ -278,7 +278,7 @@ io_fetch (IOStream *io, gsize nbytes, gchar **dest, GError **err)
 	if (_io_read (io, err))
 	    return -1;
 
-	nhi = io_fetch (io, nbytes - nlow, &buf2, &suberr);
+	nhi = io_fetch_temp (io, nbytes - nlow, &buf2, &suberr);
 
 	if (suberr != NULL) {
 	    g_propagate_error (err, suberr);
@@ -292,13 +292,13 @@ io_fetch (IOStream *io, gsize nbytes, gchar **dest, GError **err)
 }
 
 gssize
-io_fetch_type (IOStream *io, DSType type, gsize nvals, gpointer *dest,
-	       GError **err)
+io_fetch_temp_typed (IOStream *io, DSType type, gsize nvals, gpointer *dest,
+		     GError **err)
 {
     gssize retval;
 
-    retval = io_fetch (io, nvals * ds_type_sizes[type], 
-		       (gchar **) dest, err);
+    retval = io_fetch_temp (io, nvals * ds_type_sizes[type],
+			    (gchar **) dest, err);
 
     if (retval < 0)
 	return retval;

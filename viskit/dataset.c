@@ -124,8 +124,8 @@ ds_open (const char *filename, DSMode mode, GError **err)
     if (ds_open_large (ds, "header", DSM_READ, &hio, err))
 	goto bail;
 
-    while ((nread = io_fetch (&hio, DS_HEADER_RECSIZE,
-			      (gchar **) &hitem, &suberr)) > 0) {
+    while ((nread = io_fetch_temp (&hio, DS_HEADER_RECSIZE,
+				   (gchar **) &hitem, &suberr)) > 0) {
 	gchar *data;
 	gsize ndata;
 	DSSmallItem *si;
@@ -170,7 +170,7 @@ ds_open (const char *filename, DSMode mode, GError **err)
 	    guint8 align;
 	    gsize dlen;
 
-	    ndata = io_fetch (&hio, hitem->alen, &data, &suberr);
+	    ndata = io_fetch_temp (&hio, hitem->alen, &data, &suberr);
 
 	    if (ndata < 0) {
 		g_propagate_error (err, suberr);

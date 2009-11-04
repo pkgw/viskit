@@ -44,10 +44,10 @@ extern void io_uninit (IOStream *io);
 extern IOStream *io_alloc (gsize bufsz);
 extern void io_free (IOStream *io);
 
-extern gssize io_fetch (IOStream *io, gsize nbytes, gchar **dest,
-		       GError **err);
-extern gssize io_fetch_type (IOStream *io, DSType type, gsize nvals, 
-			     gpointer *dest, GError **err);
+extern gssize io_fetch_temp (IOStream *io, gsize nbytes, gchar **dest,
+			     GError **err);
+extern gssize io_fetch_temp_typed (IOStream *io, DSType type, gsize nvals,
+				   gpointer *dest, GError **err);
 extern gssize io_fetch_prealloc (IOStream *io, DSType type, gsize nvals,
 				 gpointer buf, GError **err);
 extern gboolean io_nudge_align (IOStream *io, gsize align_size, 
