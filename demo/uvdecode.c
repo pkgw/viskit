@@ -11,6 +11,7 @@ main (int argc, char **argv)
     UVVariable *var;
     gchar *uvdata, *buf;
     GError *err = NULL;
+    guint nrec = 0;
 
     if (argc != 2) {
 	fprintf (stderr, "Usage: %s <uvname>\n", argv[0]);
@@ -49,7 +50,8 @@ main (int argc, char **argv)
 	    g_free (buf);
 	    break;
 	case UVET_EOR:
-	    printf ("-- EOR --\n");
+	    printf ("-- EOR (%u) --\n", nrec);
+	    nrec++;
 	    break;
 	case UVET_EOS:
 	    printf ("-- EOS --\n");
