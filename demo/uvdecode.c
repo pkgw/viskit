@@ -54,7 +54,7 @@ main (int argc, char **argv)
 	    nrec++;
 	    break;
 	case UVET_EOS:
-	    printf ("-- EOS --\n");
+	    printf ("-- EOS (%u total records) --\n", nrec);
 	    break;
 	}
 
