@@ -176,6 +176,31 @@ bail:
     return TRUE;
 }
 
+
+GList *
+uvr_list_vars (UVReader *uvr)
+{
+    /* Not valid to call before uvr_prep has been run */
+    g_assert (uvr->vars_by_name != NULL);
+
+    /* Caller should not free list contents, only the
+     * list nodes. */
+    return g_hash_table_get_keys (uvr->vars_by_name);
+}
+
+
+UVVariable *
+uvr_query_var (UVReader *uvr, const gchar *name)
+{
+    /* Not valid to call before uvr_prep has been run */
+    g_assert (uvr->vars_by_name != NULL);
+
+    /* Caller should not use the 'nvals' or 'data' fields
+     * before reading any UV data. */
+    return g_hash_table_lookup (uvr->vars_by_name, name);
+}
+
+
 UVEntryType
 uvr_next (UVReader *uvr, gchar **data, GError **err)
 {
