@@ -202,7 +202,7 @@ uvr_query_var (UVReader *uvr, const gchar *name)
 
 
 UVEntryType
-uvr_next (UVReader *uvr, gchar **data, GError **err)
+uvr_next (UVReader *uvr, gpointer *data, GError **err)
 {
     UVHeader *header;
     UVEntryType etype;

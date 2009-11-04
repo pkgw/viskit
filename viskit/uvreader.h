@@ -27,6 +27,6 @@ extern void uvr_free (UVReader *uvr);
 extern gboolean uvr_prep (UVReader *uvr, Dataset *ds, GError **err);
 extern GList *uvr_list_vars (UVReader *uvr);
 extern UVVariable *uvr_query_var (UVReader *uvr, const gchar *name);
-extern UVEntryType uvr_next (UVReader *uvr, gchar **data, GError **err);
+extern UVEntryType uvr_next (UVReader *uvr, gpointer *data, GError **err);
 
 #endif
