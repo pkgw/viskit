@@ -75,7 +75,7 @@ Dataset *
 ds_open (const char *filename, DSMode mode, GError **err)
 {
     Dataset *ds;
-    IOStream hio;
+    InputStream hio;
     GError *suberr;
     gsize nread;
     DSHeaderItem *hitem;
@@ -120,7 +120,7 @@ ds_open (const char *filename, DSMode mode, GError **err)
 
     /* Read in that thar header */
 
-    io_init (&hio, 0);
+    io_input_init (&hio, 0);
     if (ds_open_large (ds, "header", DSM_READ, &hio, err))
 	goto bail;
 
@@ -228,7 +228,7 @@ bail:
     if (hio.fd >= 0)
 	close (hio.fd);
 
-    io_uninit (&hio);
+    io_input_uninit (&hio);
     ds_close (ds);
     return NULL;
 }
@@ -304,7 +304,7 @@ ds_list_items (Dataset *ds, GError **err)
 }
 
 gboolean
-ds_open_large (Dataset *ds, gchar *name, DSMode mode, IOStream *io, GError **err)
+ds_open_large (Dataset *ds, gchar *name, DSMode mode, InputStream *io, GError **err)
 {
     /* Note: this function is called in ds_open to read the header, so
      * keep in mind that ds may not be fully initialized. */

@@ -24,7 +24,7 @@ typedef struct _UVHeader {
 #define NUMVARS 256 
 
 struct _UVReader {
-    IOStream vd; /* visdata */
+    InputStream vd; /* visdata */
 
     gint nvars;
     GHashTable *vars_by_name;
@@ -47,7 +47,7 @@ uvr_alloc (void)
     UVReader *uvr;
 
     uvr = g_new0 (UVReader, 1);
-    io_init (&(uvr->vd), 0);
+    io_input_init (&(uvr->vd), 0);
     return uvr;
 }
 
@@ -59,7 +59,7 @@ uvr_free (UVReader *uvr)
 	uvr->vd.fd = -1;
     }
 
-    io_uninit (&(uvr->vd));
+    io_input_uninit (&(uvr->vd));
 
     if (uvr->vars_by_name != NULL) {
 	g_hash_table_destroy (uvr->vars_by_name);
@@ -72,7 +72,7 @@ uvr_free (UVReader *uvr)
 gboolean
 uvr_prep (UVReader *uvr, Dataset *ds, GError **err)
 {
-    IOStream vtab;
+    InputStream vtab;
     gchar vtbuf[12]; /* char, space, 8 chars, newline, \0 */
     gchar *vtcur;
     int vtidx;
@@ -85,7 +85,7 @@ uvr_prep (UVReader *uvr, Dataset *ds, GError **err)
 
     /* Read in variable table */
 
-    io_init (&vtab, 0);
+    io_input_init (&vtab, 0);
     if (ds_open_large (ds, "vartable", DSM_READ, &vtab, err))
 	goto bail;
 
@@ -155,7 +155,7 @@ uvr_prep (UVReader *uvr, Dataset *ds, GError **err)
 
     close (vtab.fd);
     vtab.fd = -1;
-    io_uninit (&vtab);
+    io_input_uninit (&vtab);
 
     /* FIXME: check for vartable not ending in newline */
 

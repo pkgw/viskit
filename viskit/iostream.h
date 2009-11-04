@@ -4,7 +4,7 @@
 #include <glib.h>
 #include <viskit/types.h>
 
-typedef struct _IOStream IOStream;
+typedef struct _InputStream InputStream;
 
 
 /* Dealing with endianness conversions */
@@ -20,15 +20,13 @@ extern void io_recode_data_inplace (gchar *data, DSType type, gsize nvals);
 
 /* The actual I/O routines */
 
-struct _IOStream {
+struct _InputStream {
     int fd;
     gsize bufsz;
-    gchar *rbuf, *wbuf;
-    gsize rpos, wpos; /* position of read and write cursors
-		       * within buffers. */
-    gboolean reof;
-    gsize rend, wend; /* location of next needed r/w IO
-		       * operations */
+    gchar *rbuf;
+    gsize rpos; /* position of read cursor within buffer. */
+    gboolean reof; /* have we read to EOF? */
+    gsize rend; /* location of EOF within the buffer */
     gchar *scratch; /* for block-crossing read requests. */
 };
 
@@ -39,18 +37,18 @@ struct _IOStream {
     g_set_error (err, G_FILE_ERROR, g_file_error_from_errno(errno),	\
 		 msg ": %s", rest, g_strerror (errno))
 
-extern void io_init (IOStream *io, gsize bufsz);
-extern void io_uninit (IOStream *io);
-extern IOStream *io_alloc (gsize bufsz);
-extern void io_free (IOStream *io);
+extern void io_input_init (InputStream *io, gsize bufsz);
+extern void io_input_uninit (InputStream *io);
+extern InputStream *io_input_alloc (gsize bufsz);
+extern void io_input_free (InputStream *io);
 
-extern gssize io_fetch_temp (IOStream *io, gsize nbytes, gchar **dest,
+extern gssize io_fetch_temp (InputStream *io, gsize nbytes, gchar **dest,
 			     GError **err);
-extern gssize io_fetch_temp_typed (IOStream *io, DSType type, gsize nvals,
+extern gssize io_fetch_temp_typed (InputStream *io, DSType type, gsize nvals,
 				   gpointer *dest, GError **err);
-extern gssize io_fetch_prealloc (IOStream *io, DSType type, gsize nvals,
+extern gssize io_fetch_prealloc (InputStream *io, DSType type, gsize nvals,
 				 gpointer buf, GError **err);
-extern gboolean io_nudge_align (IOStream *io, gsize align_size, 
+extern gboolean io_nudge_align (InputStream *io, gsize align_size, 
 				GError **err);
 
 #endif

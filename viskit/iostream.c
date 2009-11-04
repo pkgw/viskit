@@ -127,7 +127,7 @@ io_recode_data_inplace (gchar *data, DSType type, gsize nvals)
 /* Actual I/O operations. */
 
 void
-io_init (IOStream *io, gsize bufsz)
+io_input_init (InputStream *io, gsize bufsz)
 {
     if (bufsz == 0)
 	bufsz = DEFAULT_BUFSZ;
@@ -137,33 +137,32 @@ io_init (IOStream *io, gsize bufsz)
 
     io->fd = -1;
     io->bufsz = bufsz;
-    io->rbuf = g_new (gchar, bufsz * 3); /* Allocate the three buffers all as one block. */
-    io->wbuf = io->rbuf + bufsz;
-    io->scratch = io->wbuf + bufsz;
-    io->wpos = io->reof = 0;
-    io->wend = io->rend = 0;
+    io->rbuf = g_new (gchar, bufsz * 2); /* Allocate the two buffers as one block. */
+    io->scratch = io->rbuf + bufsz;
+    io->reof = FALSE;
+    io->rend = 0;
     io->rpos = bufsz; /* Forces a block to be read on first fetch */
 }
 
 void
-io_uninit (IOStream *io)
+io_input_uninit (InputStream *io)
 {
     g_free (io->rbuf);
-    io->rbuf = io->wbuf = io->scratch = NULL;
+    io->rbuf = io->scratch = NULL;
 }
 
-IOStream *
-io_alloc (gsize bufsz)
+InputStream *
+io_input_alloc (gsize bufsz)
 {
-    IOStream *io = g_new0 (IOStream, 1);
-    io_init (io, bufsz);
+    InputStream *io = g_new0 (InputStream, 1);
+    io_input_init (io, bufsz);
     return io;
 }
 
 void
-io_free (IOStream *io)
+io_input_free (InputStream *io)
 {
-    io_uninit (io);
+    io_input_uninit (io);
     g_free (io);
 }
 
@@ -194,7 +193,7 @@ _io_fd_read (int fd, gpointer buf, gsize nbytes, GError **err)
 }
 
 static gboolean
-_io_read (IOStream *io, GError **err)
+_io_read (InputStream *io, GError **err)
 {
     gssize nread = _io_fd_read (io->fd, io->rbuf, io->bufsz, err);
 
@@ -212,7 +211,7 @@ _io_read (IOStream *io, GError **err)
 }
 
 gssize
-io_fetch_temp (IOStream *io, gsize nbytes, gchar **dest, GError **err)
+io_fetch_temp (InputStream *io, gsize nbytes, gchar **dest, GError **err)
 {
     /* disallow this situation for now. */
     g_assert (nbytes <= io->bufsz);
@@ -292,7 +291,7 @@ io_fetch_temp (IOStream *io, gsize nbytes, gchar **dest, GError **err)
 }
 
 gssize
-io_fetch_temp_typed (IOStream *io, DSType type, gsize nvals, gpointer *dest,
+io_fetch_temp_typed (InputStream *io, DSType type, gsize nvals, gpointer *dest,
 		     GError **err)
 {
     gssize retval;
@@ -308,7 +307,7 @@ io_fetch_temp_typed (IOStream *io, DSType type, gsize nvals, gpointer *dest,
 }
 
 gssize
-io_fetch_prealloc (IOStream *io, DSType type, gsize nvals, gpointer buf,
+io_fetch_prealloc (InputStream *io, DSType type, gsize nvals, gpointer buf,
 		   GError **err)
 {
     gsize nbytes, ninbuf;
@@ -394,7 +393,7 @@ io_fetch_prealloc (IOStream *io, DSType type, gsize nvals, gpointer buf,
 
 
 gboolean
-io_nudge_align (IOStream *io, gsize align_size, GError **err)
+io_nudge_align (InputStream *io, gsize align_size, GError **err)
 {
     gsize n = io->rpos % align_size;
 

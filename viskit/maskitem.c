@@ -7,7 +7,7 @@
 #include <unistd.h>
 
 struct _MaskItem {
-    IOStream stream;
+    InputStream stream;
     int bits_left_in_current;
     guint32 current_val;
 };
@@ -29,7 +29,7 @@ mask_open (Dataset *ds, gchar *name, DSMode mode, GError **err)
     MaskItem *mask;
 
     mask = g_new0 (MaskItem, 1);
-    io_init (&(mask->stream), 0);
+    io_input_init (&(mask->stream), 0);
 
     if (ds_open_large (ds, name, mode, &(mask->stream), err)) {
 	mask_close (mask);
@@ -49,7 +49,7 @@ mask_close (MaskItem *mask)
 	mask->stream.fd = -1;
     }
 
-    io_uninit (&(mask->stream));
+    io_input_uninit (&(mask->stream));
     g_free (mask);
 }
 
