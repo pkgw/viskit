@@ -10,6 +10,7 @@
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
+#include <string.h> /*memcpy*/
 
 
 #define DEFAULT_BUFSZ 4096
@@ -166,32 +167,47 @@ io_free (IOStream *io)
     g_free (io);
 }
 
-static gboolean
-_io_read (IOStream *io, GError **err)
+static gssize
+_io_fd_read (int fd, gpointer buf, gsize nbytes, GError **err)
 {
-    gsize nleft = io->bufsz;
-    gchar *buf = io->rbuf;
+    gsize nleft = nbytes;
     gssize nread;
     
     while (nleft > 0) {
-	nread = read (io->fd, buf, nleft);
+	nread = read (fd, buf, nleft);
 
-	if (nread < 0 && errno != EINTR) {
+	if (nread < 0) {
+	    if (errno == EINTR)
+		continue;
 	    IO_ERRNO_ERR (err, errno, "Failed to read stream");
-	    return TRUE;
+	    return -1;
 	}
 
-	if (nread == 0) {
-	    /* EOF */
-	    io->rend = io->bufsz - nleft;
-	    io->reof = TRUE;
-	    return FALSE;
-	}
+	if (nread == 0) /* EOF */
+	    break;
 
 	buf += nread;
 	nleft -= nread;
     }
 
+    return nbytes - nleft;
+}
+
+static gboolean
+_io_read (IOStream *io, GError **err)
+{
+    gssize nread = _io_fd_read (io->fd, io->rbuf, io->bufsz, err);
+
+    if (nread < 0)
+	return TRUE;
+
+    if (nread != io->bufsz) {
+	/* EOF, since we couldn't get as much data as we wanted */
+	io->reof = TRUE;
+	io->rend = nread;
+    }
+
+    io->rpos = 0;
     return FALSE;
 }
 
@@ -232,7 +248,6 @@ io_fetch (IOStream *io, gsize nbytes, gchar **dest, GError **err)
 	if (_io_read (io, err))
 	    return -1;
 
-	io->rpos = 0;
 	return io_fetch (io, nbytes, dest, err);
     }
 
@@ -263,7 +278,6 @@ io_fetch (IOStream *io, gsize nbytes, gchar **dest, GError **err)
 	if (_io_read (io, err))
 	    return -1;
 
-	io->rpos = 0;
 	nhi = io_fetch (io, nbytes - nlow, &buf2, &suberr);
 
 	if (suberr != NULL) {
@@ -290,8 +304,85 @@ io_fetch_type (IOStream *io, DSType type, gsize nvals, gpointer *dest,
 	return retval;
 
     io_recode_data_inplace (*dest, type, nvals);
-    return retval;
+    return retval / ds_type_sizes[type];
 }
+
+gssize
+io_fetch_prealloc (IOStream *io, DSType type, gsize nvals, gpointer buf,
+		   GError **err)
+{
+    gsize nbytes, ninbuf;
+
+    g_assert (buf != NULL);
+
+    nbytes = nvals * ds_type_sizes[type];
+
+    /* At EOF? If we, all we need to do is decode the already-read
+     * data into the caller's buffer. If there isn't as much data left
+     * as the user requested, return a short read. */
+
+    if (io->reof) {
+	nbytes = MIN (io->rend - io->rpos, nbytes);
+
+	if (nbytes % ds_type_sizes[type] != 0)
+	    /* Nonintegral number of items -- treat as truncated file
+	     * which we consider to be an I/O error.*/
+	    return -1;
+
+	nvals = nbytes / ds_type_sizes[type];
+	io_recode_data_copy (io->rbuf + io->rpos, buf, type, nvals);
+	io->rpos += nbytes;
+	return nvals;
+    }
+
+    /* Not at EOF. First, we copy over whatever data have already been
+     * buffered. If there's no more to be done, we'll leave the buffer
+     * in the correct state to be refilled for the next operation. */
+
+    ninbuf = MIN (nbytes, io->bufsz - io->rpos);
+    memcpy (buf, io->rbuf + io->rpos, ninbuf);
+    io->rpos += ninbuf;
+
+    /* If we need to read more, do so, reading directly into the
+     * caller's buffer. */
+
+    if (ninbuf < nbytes) {
+	gsize ntoread = nbytes - ninbuf;
+	gssize nread = _io_fd_read (io->fd, buf + ninbuf, ntoread, err);
+	nbytes = ninbuf + nread;
+
+	if (nread < ntoread) {
+	    /* EOF, short read */
+	    io->rpos = 0;
+	    io->rend = 0;
+	    io->reof = TRUE;
+	} else {
+	    /* Not EOF -- we need to partially refill the IO stream buffer
+	     * to preserve its alignment properties.*/
+	    io->rpos = ntoread % io->bufsz;
+	    nread = _io_fd_read (io->fd, io->rbuf + io->rpos,
+				 io->bufsz - io->rpos, err);
+
+	    if (nread != (io->bufsz - io->rpos)) {
+		/* OK, now we hit EOF. */
+		io->rend = io->rpos + nread;
+		io->reof = TRUE;
+	    }
+	}
+    }
+
+    /* We may have a short read -- integral number of items read? */
+
+    if (nbytes % ds_type_sizes[type] != 0)
+	return -1;
+
+    /* Yay, finished successfully. */
+
+    nvals = nbytes / ds_type_sizes[type];
+    io_recode_data_inplace (buf, type, nvals);
+    return nvals;
+}
+
 
 gboolean
 io_nudge_align (IOStream *io, gsize align_size, GError **err)
