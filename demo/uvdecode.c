@@ -2,6 +2,8 @@
 #include <glib.h>
 #include <viskit/uvreader.h>
 
+/*#define SILENT*/
+
 int
 main (int argc, char **argv)
 {
@@ -9,7 +11,10 @@ main (int argc, char **argv)
     UVReader *uvr;
     UVEntryType uvet;
     UVVariable *var;
-    gchar *uvdata, *buf;
+    gchar *uvdata;
+#ifndef SILENT
+    gchar *buf;
+#endif
     GError *err = NULL;
     guint nrec = 0;
 
@@ -41,20 +46,28 @@ main (int argc, char **argv)
 	    return 1;
 	case UVET_SIZE:
 	    var = (UVVariable *) uvdata;
+#ifndef SILENT
 	    printf ("%s.nval = %li\n", var->name, (long int) var->nvals);
+#endif
 	    break;
 	case UVET_DATA:
 	    var = (UVVariable *) uvdata;
+#ifndef SILENT
 	    buf = ds_type_format (var->data, var->type, var->nvals);
 	    printf ("%s.data = %s\n", var->name, buf);
 	    g_free (buf);
+#endif
 	    break;
 	case UVET_EOR:
+#ifndef SILENT
 	    printf ("-- EOR (%u) --\n", nrec);
+#endif
 	    nrec++;
 	    break;
 	case UVET_EOS:
+#ifndef SILENT
 	    printf ("-- EOS (%u total records) --\n", nrec);
+#endif
 	    break;
 	}
 
