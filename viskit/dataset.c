@@ -10,8 +10,6 @@
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
-#include <stdio.h> /*printf*/
-
 
 /* Note that these limits are set by the file format and MUST NOT be
  * changed by the user. Doing so will break compatibility with the
@@ -211,9 +209,6 @@ ds_open (const char *filename, DSMode mode, GError **err)
 	    si->nvals = dlen / ds_type_sizes[si->type];
 	    io_recode_data_copy (data, si->vals.text, si->type, si->nvals);
 	    g_hash_table_insert (ds->small_items, si->name, si);
-
-	    /*printf ("ITEM: %s %c %d\n", hitem->name, ds_type_codes[si->type],
-	      dlen / ds_type_sizes[si->type]);*/
 	}
 
 	if (io_nudge_align (&hio, DS_HEADER_RECSIZE, &suberr)) {
