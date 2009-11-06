@@ -10,6 +10,7 @@
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
+#include <ctype.h> /*isprint*/
 
 /* Note that these limits are set by the file format and MUST NOT be
  * changed by the user. Doing so will break compatibility with the
@@ -317,4 +318,129 @@ ds_open_large (Dataset *ds, gchar *name, DSMode mode, InputStream *io, GError **
     }
 
     return FALSE;
+}
+
+static gboolean
+_ds_probe_large_item (Dataset *ds, gchar *name, DSType *type,
+		      gsize *nvals, GError **err)
+{
+    InputStream io;
+    gssize nread;
+    gchar *data;
+    guint32 v;
+    gboolean retval;
+    struct stat statbuf;
+    int ofs;
+
+    *type = DST_UNK;
+    *nvals = 0;
+    retval = TRUE;
+
+    io_input_init (&io, 0);
+
+    if (ds_open_large (ds, name, DSM_READ, &io, err))
+	goto done;
+
+    if (fstat (io.fd, &statbuf)) {
+	IO_ERRNO_ERRV (err, errno, "Unable to stat dataset item \"%s\"", name);
+	goto done;
+    }
+
+    nread = io_fetch_temp (&io, 4, &data, err);
+
+    if (nread < 0)
+	goto done;
+
+    /* From here on out, we've done all of the IO that we need to,
+     * so even if we can't identify the type we won't encounter
+     * an error. */
+
+    retval = FALSE;
+
+    if (nread != 4)
+	/* Unknown. */
+	goto done;
+
+    v = IO_RECODE_I32 (data);
+
+    switch (v) {
+    case DST_I8:
+    case DST_I32:
+    case DST_I16:
+    case DST_F32:
+    case DST_F64:
+    case DST_C64:
+    case DST_I64:
+	*type = (DSType) v;
+
+	ofs = MIN (4, ds_type_aligns[*type]);
+	*nvals = (statbuf.st_size - ofs) / ds_type_sizes[*type];
+
+	if (*nvals * ds_type_sizes[*type] + ofs != statbuf.st_size) {
+	    *type = DST_UNK;
+	    *nvals = 0;
+	}
+
+	goto done;
+    case 0:
+	/* Mixed binary type. Express it as DST_UNKNOWN but give it
+	 * a size in bytes. */
+	*nvals = statbuf.st_size - 4;
+    default:
+	break;
+    }
+
+    /* First four bytes didn't indicate type. Does this look like ASCII
+     * text? */
+
+    for (ofs = 0; ofs < 4; ofs++)
+	if (!isprint ((int) data[ofs]))
+	    break;
+
+    if (ofs == 4) {
+	*type = DST_TEXT;
+	*nvals = statbuf.st_size;
+    }
+
+done:
+    if (io.fd > 0)
+	close (io.fd);
+    io_input_uninit (&io);
+    return retval;
+}
+
+
+DSItemInfo *
+ds_probe_item (Dataset *ds, gchar *name, GError **err)
+{
+    DSItemInfo *dii;
+    DSSmallItem *small;
+    gboolean is_large;
+    DSType type;
+    gsize nvals;
+
+    small = (DSSmallItem *) g_hash_table_lookup (ds->small_items, name);
+    is_large = (small == NULL);
+
+    if (!is_large) {
+	type = small->type;
+	nvals = small->nvals;
+    } else {
+	if (_ds_probe_large_item (ds, name, &type, &nvals, err))
+	    return NULL;
+    }
+
+    dii = g_new0 (DSItemInfo, 1);
+    dii->name = g_strdup (name);
+    dii->is_large = is_large;
+    dii->type = type;
+    dii->nvals = nvals;
+    return dii;
+}
+
+void
+ds_item_info_free (DSItemInfo *dii)
+{
+    g_free (dii->name);
+    g_free (dii);
 }
