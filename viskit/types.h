@@ -20,6 +20,7 @@ typedef enum _DSType {
 extern const char ds_type_codes[];
 extern const guint8 ds_type_sizes[];
 extern const guint8 ds_type_aligns[];
+extern const gchar *ds_type_names[];
 
 extern gchar *ds_type_format (gchar *data, DSType type, gssize nvals)
     G_GNUC_WARN_UNUSED_RESULT;

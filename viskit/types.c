@@ -18,6 +18,11 @@ const guint8 ds_type_aligns[] = {
     0, 1, 4, 2, 4, 8, 1, 4, 8
 };
 
+const gchar *ds_type_names[] = {
+    "unknown", "int8", "int32", "int16", "float32",
+    "float64", "text", "complex64", "int64"
+};
+
 static const gchar *_ds_type_formats[] = {
     "?", "%hhd", "%" G_GINT32_FORMAT, "%" G_GINT16_FORMAT,
     "%g", "%g", NULL, "%g%+gi", "%" G_GINT64_FORMAT
