@@ -1,5 +1,7 @@
 #include <types.h>
 
+#include <string.h> /*memcpy*/
+
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
@@ -22,6 +24,94 @@ const gchar *ds_type_names[] = {
     "unknown", "int8", "int32", "int16", "float32",
     "float64", "text", "complex64", "int64"
 };
+
+/* Type upconversion */
+
+typedef union _Dataptr {
+    /* This union is identical to the endianness-recoding
+     * one found in iostream.c */
+    gpointer any;
+    gint8 *i8;
+    gint16 *i16;
+    gint32 *i32;
+    gint64 *i64;
+    gfloat *f32;
+    gdouble *f64;
+    gchar *text;
+} Dataptr;
+
+#define UPCONV_BEGIN(dglib,dlowname)			\
+ static gboolean \
+ _ds_type_upconvert_##dlowname (DSType srctype, gpointer srcdata, gpointer destdata, \
+			     gsize nvals) \
+ { \
+    Dataptr s; \
+    dglib *d = (dglib *) destdata; \
+    s.any = srcdata; \
+    switch (srctype) {
+#define UPCONV_DO(dglib,scapname,slowname) \
+    case DST_##scapname: while (nvals-- > 0) *d++ = (dglib) *s.slowname++; break;
+#define UPCONV_END(dglib) \
+    default: \
+	return TRUE; \
+    } \
+    return FALSE; \
+ }
+
+UPCONV_BEGIN(gint16,i16)
+UPCONV_DO(gint16,I8,i8)
+UPCONV_END(gint16)
+
+UPCONV_BEGIN(gint32,i32)
+UPCONV_DO(gint32,I8,i8)
+UPCONV_DO(gint32,I16,i16)
+UPCONV_END(gint32)
+
+UPCONV_BEGIN(gint64,i64)
+UPCONV_DO(gint64,I8,i8)
+UPCONV_DO(gint64,I16,i16)
+UPCONV_DO(gint64,I32,i32)
+UPCONV_END(gint64)
+
+UPCONV_BEGIN(gfloat,f32)
+UPCONV_DO(gfloat,I8,i8)
+UPCONV_DO(gfloat,I16,i16)
+UPCONV_DO(gfloat,I32,i32)
+UPCONV_DO(gfloat,I64,i64)
+UPCONV_END(gfloat)
+
+UPCONV_BEGIN(gdouble,f64)
+UPCONV_DO(gdouble,I8,i8)
+UPCONV_DO(gdouble,I16,i16)
+UPCONV_DO(gdouble,I32,i32)
+UPCONV_DO(gdouble,I64,i64)
+UPCONV_DO(gdouble,F32,f32)
+UPCONV_END(gdouble)
+
+gboolean
+ds_type_upconvert (DSType srctype, gpointer srcdata, DSType desttype,
+		   gpointer destdata, gsize nvals)
+{
+    if (srctype == desttype) {
+	memcpy (destdata, srcdata, nvals * ds_type_sizes[srctype]);
+	return FALSE;
+    }
+
+    switch (desttype) {
+    case DST_I16:
+	return _ds_type_upconvert_i16 (srctype, srcdata, destdata, nvals);
+    case DST_I32:
+	return _ds_type_upconvert_i32 (srctype, srcdata, destdata, nvals);
+    case DST_I64:
+	return _ds_type_upconvert_i64 (srctype, srcdata, destdata, nvals);
+    case DST_F32:
+	return _ds_type_upconvert_f32 (srctype, srcdata, destdata, nvals);
+    case DST_F64:
+	return _ds_type_upconvert_f64 (srctype, srcdata, destdata, nvals);
+    default:
+	return TRUE;
+    }
+}
 
 static const gchar *_ds_type_formats[] = {
     "?", "%hhd", "%" G_GINT32_FORMAT, "%" G_GINT16_FORMAT,

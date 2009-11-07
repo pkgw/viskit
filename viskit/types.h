@@ -25,4 +25,8 @@ extern const gchar *ds_type_names[];
 extern gchar *ds_type_format (gpointer data, DSType type, gssize nvals)
     G_GNUC_WARN_UNUSED_RESULT;
 
+extern gboolean ds_type_upconvert (DSType srctype, gpointer srcdata,
+				   DSType desttype, gpointer destdata,
+				   gsize nvals);
+
 #endif
