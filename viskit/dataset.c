@@ -190,6 +190,8 @@ ds_open (const char *filename, DSMode mode, GError **err)
 		goto bail;
 	    }
 
+	    data += 4;
+
 	    /* We may have to jump around a bit to realign ourselves if
 	     * this small item is an 8-byte type. */
 
