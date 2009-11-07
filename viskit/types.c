@@ -29,7 +29,7 @@ static const gchar *_ds_type_formats[] = {
 };
 
 gchar *
-ds_type_format (gchar *data, DSType type, gssize nvals)
+ds_type_format (gpointer data, DSType type, gssize nvals)
 {
     GString *s;
     const gchar *fmt;
@@ -42,7 +42,7 @@ ds_type_format (gchar *data, DSType type, gssize nvals)
 	return g_strdup ("<>");
 
     if (type == DST_TEXT)
-	return g_strdup_printf ("\"%.*s\"", nvals, data);
+	return g_strdup_printf ("\"%.*s\"", nvals, (gchar *) data);
 
     s = g_string_new ("");
 
