@@ -113,7 +113,7 @@ of a record as S.
 Immediately after each table entry are the data corresponding to the
 entry. Zero-length items have no data record.
 
-The first 4 bytes of a data record the typecode of the data in an i4. 
+The first 4 bytes of a data record the typecode of the data in an i32.
 
 The next S-4 bytes of the data record store the actual data values,
 subject to alignment restrictions. If the offset of the byte
