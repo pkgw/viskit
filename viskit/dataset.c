@@ -480,3 +480,24 @@ ds_get_item_f64 (Dataset *ds, const gchar *name, gdouble *val)
     return ds_type_upconvert (small->type, (gpointer) &(small->vals.i8[0]),
 			      DST_F64, (gpointer) val, 1);
 }
+
+gchar *
+ds_get_item_short_string (Dataset *ds, const gchar *name)
+{
+    DSSmallItem *small;
+
+    small = (DSSmallItem *) g_hash_table_lookup (ds->small_items, name);
+
+    if (small == NULL)
+	return NULL;
+
+    if (small->type != DST_I8)
+	/* Note: textual short items are stored with a type
+	 * indicator of i8, not text. Unsure if there is a way to
+	 * distinguish between the two -- probably nothing creates
+	 * a short item with an actual type of i8 unless it's
+	 * trying to break things intentionally. */
+	return NULL;
+
+    return g_strndup (small->vals.text, small->nvals);
+}
