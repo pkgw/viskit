@@ -46,4 +46,7 @@ extern gboolean ds_open_large (Dataset *ds, gchar *name,
 extern DSItemInfo *ds_probe_item (Dataset *ds, gchar *name, GError **err);
 extern void ds_item_info_free (DSItemInfo *dii);
 
+extern gboolean ds_get_item_i64 (Dataset *ds, const gchar *name, gint64 *val);
+extern gboolean ds_get_item_f64 (Dataset *ds, const gchar *name, gdouble *val);
+
 #endif

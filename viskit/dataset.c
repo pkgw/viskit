@@ -446,3 +446,37 @@ ds_item_info_free (DSItemInfo *dii)
     g_free (dii->name);
     g_free (dii);
 }
+
+gboolean
+ds_get_item_i64 (Dataset *ds, const gchar *name, gint64 *val)
+{
+    DSSmallItem *small;
+
+    small = (DSSmallItem *) g_hash_table_lookup (ds->small_items, name);
+
+    if (small == NULL)
+	return TRUE;
+
+    if (small->nvals != 1)
+	return TRUE;
+
+    return ds_type_upconvert (small->type, (gpointer) &(small->vals.i8[0]),
+			      DST_I64, (gpointer) val, 1);
+}
+
+gboolean
+ds_get_item_f64 (Dataset *ds, const gchar *name, gdouble *val)
+{
+    DSSmallItem *small;
+
+    small = (DSSmallItem *) g_hash_table_lookup (ds->small_items, name);
+
+    if (small == NULL)
+	return TRUE;
+
+    if (small->nvals != 1)
+	return TRUE;
+
+    return ds_type_upconvert (small->type, (gpointer) &(small->vals.i8[0]),
+			      DST_F64, (gpointer) val, 1);
+}
