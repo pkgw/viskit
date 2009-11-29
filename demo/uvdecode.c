@@ -11,7 +11,7 @@ main (int argc, char **argv)
     UVReader *uvr;
     UVEntryType uvet;
     UVVariable *var;
-    gchar *uvdata;
+    gpointer uvdata;
 #ifndef SILENT
     gchar *buf;
 #endif
