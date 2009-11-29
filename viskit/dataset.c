@@ -48,6 +48,8 @@ typedef struct _DSSmallItem {
     } vals;
 } DSSmallItem;
 
+#define DSI_DATA(small) ((gpointer) &(small->vals.i8[0]))
+
 GQuark
 ds_error_quark (void)
 {
@@ -460,8 +462,8 @@ ds_get_item_i64 (Dataset *ds, const gchar *name, gint64 *val)
     if (small->nvals != 1)
 	return TRUE;
 
-    return ds_type_upconvert (small->type, (gpointer) &(small->vals.i8[0]),
-			      DST_I64, (gpointer) val, 1);
+    return ds_type_upconvert (small->type, DSI_DATA(small), DST_I64,
+			      (gpointer) val, 1);
 }
 
 gboolean
@@ -477,8 +479,8 @@ ds_get_item_f64 (Dataset *ds, const gchar *name, gdouble *val)
     if (small->nvals != 1)
 	return TRUE;
 
-    return ds_type_upconvert (small->type, (gpointer) &(small->vals.i8[0]),
-			      DST_F64, (gpointer) val, 1);
+    return ds_type_upconvert (small->type, DSI_DATA (small), DST_F64,
+			      (gpointer) val, 1);
 }
 
 gchar *
