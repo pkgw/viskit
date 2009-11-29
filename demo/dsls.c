@@ -70,7 +70,7 @@ main (int argc, char **argv)
 		break;
 	    }
 	} else if (!dii->is_large && dii->type == DST_I8) {
-	    gchar *s = ds_get_item_short_string (ds, name);
+	    gchar *s = ds_get_item_small_string (ds, name);
 
 	    if (s == NULL)
 		printf (" = [unstringable?!]");

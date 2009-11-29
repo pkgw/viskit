@@ -484,7 +484,7 @@ ds_get_item_f64 (Dataset *ds, const gchar *name, gdouble *val)
 }
 
 gchar *
-ds_get_item_short_string (Dataset *ds, const gchar *name)
+ds_get_item_small_string (Dataset *ds, const gchar *name)
 {
     DSSmallItem *small;
 
@@ -494,10 +494,10 @@ ds_get_item_short_string (Dataset *ds, const gchar *name)
 	return NULL;
 
     if (small->type != DST_I8)
-	/* Note: textual short items are stored with a type
+	/* Note: textual small items are stored with a type
 	 * indicator of i8, not text. Unsure if there is a way to
 	 * distinguish between the two -- probably nothing creates
-	 * a short item with an actual type of i8 unless it's
+	 * a small item with an actual type of i8 unless it's
 	 * trying to break things intentionally. */
 	return NULL;
 
