@@ -15,6 +15,13 @@
 
 #define DEFAULT_BUFSZ 16384
 
+static gssize _io_fd_read (int fd, gpointer buf, gsize nbytes, GError **err);
+static gboolean _io_fd_write (int fd, const gpointer buf, gsize nbytes,
+			      GError **err);
+static gboolean _io_read (IOStream *io, GError **err);
+static gboolean _io_write (IOStream *io, GError **err);
+
+
 
 /* Dealing with endianness conversion: MIRIAD datasets are
  * standardized to big-endian */
@@ -202,6 +209,9 @@ io_new_from_fd (IOMode mode, int fd, gsize bufsz, goffset align_hint)
 void
 io_free (IOStream *io)
 {
+    if (io == NULL)
+	return;
+
     switch (io->mode) {
     case IO_MODE_READ:
 	g_free (io->s.read.buf);
@@ -226,10 +236,19 @@ io_close_and_free (IOStream *io, GError **err)
 {
     gboolean retval = FALSE;
 
-    if (err != NULL)
-	*err = NULL;
+    if (io == NULL)
+	return FALSE;
 
     if (io->fd >= 0) {
+	if (io->mode == IO_MODE_WRITE) {
+	    /* Any pending writes to flush? */
+
+	    if (io->s.write.curpos != 0) {
+		if (_io_fd_write (io->fd, io->s.write.buf, io->s.write.curpos, err))
+		    retval = TRUE;
+	    }
+	}
+
 	if (close (io->fd)) {
 	    IO_ERRNO_ERR (err, errno, "Failed to close stream");
 	    retval = TRUE;
