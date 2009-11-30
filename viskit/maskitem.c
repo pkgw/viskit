@@ -24,7 +24,7 @@ static const guint32 bitmasks[31] = {
 };
 
 MaskItem *
-mask_open (Dataset *ds, const gchar *name, IOMode mode, IOOpenFlags flags,
+mask_open (Dataset *ds, const gchar *name, IOMode mode, DSOpenFlags flags,
 	   GError **err)
 {
     MaskItem *mask;

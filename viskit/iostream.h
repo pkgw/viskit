@@ -12,15 +12,6 @@ typedef enum _IOMode {
     IO_MODE_READ_WRITE = IO_MODE_READ | IO_MODE_WRITE,
 } IOMode;
 
-typedef enum _IOOpenFlags {
-    /* If opening for write and doesn't exist, CREATE_OK specifies whether
-     * to create the item. If opening for write and does exist, TRUNCATE
-     * instructs to truncate the stream; otherwise, it is opened for
-     * appending. */
-    IO_OFLAGS_CREATE_OK = 1 << 0,
-    IO_OFLAGS_TRUNCATE  = 1 << 1,
-} IOOpenFlags;
-
 
 /* Dealing with endianness conversions */
 

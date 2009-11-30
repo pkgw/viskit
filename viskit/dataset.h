@@ -7,6 +7,43 @@
 
 typedef struct _Dataset Dataset;
 
+typedef enum _DSOpenFlags {
+    /* For whole datasets, if opening for read only, flags are ignored.
+     * Opening for write only is disallowed.
+     * Otherwise,
+     * - CREATE_OK indicates that if the named dataset doesn't exist,
+     *   an empty dataset should be created.
+     * - EXIST_BAD indicates that if the named dataset does exist,
+     *   the open shall fail. Implies CREATE_OK.
+     * - APPEND indicates that existing items in the dataset may
+     *   not be rewritten; short items may be added, new long items
+     *   may be created, and existing long items may be appended to.
+     * - TRUNCATE indicates that if the named dataset exists, all
+     *   of its contents will be deleted. TRUNCATE and APPEND are
+     *   mutually exclusive.
+     * The default behavior with write capability is thus:
+     * - If no such dataset exists, fail.
+     * - Existing items may be modified in any way.
+     * - The dataset will not be modified upon open.
+     *
+     * For dataset items, if opening readonly, flags are ignored.
+     * Otherwise,
+     * - CREATE_OK indicates that if the named item doesn't exist,
+     *   it should be created as an empty file.
+     * - EXIST_BAD indicates that if the named item does exist,
+     *   the open shall fail. Implies CREATE_OK.
+     * - APPEND indicates that an existing item should be appended to.
+     * - TRUNCATE indicates that if the named item exists, it will
+     *   be truncated. TRUNCATE and APPEND are mutually exclusive and
+     *   one of them must be specified.
+     */
+
+    DS_OFLAGS_CREATE_OK = 1 << 0,
+    DS_OFLAGS_EXIST_BAD = 1 << 1,
+    DS_OFLAGS_TRUNCATE  = 1 << 2,
+    DS_OFLAGS_APPEND    = 1 << 3,
+} DSOpenFlags;
+
 /* Custom errors */
 
 #define DS_ERROR ds_error_quark ()
@@ -27,7 +64,7 @@ typedef struct _DSItemInfo {
     gsize nvals;
 } DSItemInfo;
 
-extern Dataset *ds_open (const char *filename, IOMode mode, IOOpenFlags flags,
+extern Dataset *ds_open (const char *filename, IOMode mode, DSOpenFlags flags,
 			 GError **err)
     G_GNUC_WARN_UNUSED_RESULT;
 extern gboolean ds_close (Dataset *ds, GError **err);
@@ -36,7 +73,7 @@ extern gboolean ds_has_item (Dataset *ds, const gchar *name);
 extern GSList *ds_list_items (Dataset *ds, GError **err)
     G_GNUC_WARN_UNUSED_RESULT;
 extern IOStream *ds_open_large_item (Dataset *ds, const gchar *name, IOMode mode,
-				     IOOpenFlags flags, GError **err);
+				     DSOpenFlags flags, GError **err);
 extern DSItemInfo *ds_probe_item (Dataset *ds, const gchar *name, GError **err);
 extern void ds_item_info_free (DSItemInfo *dii);
 

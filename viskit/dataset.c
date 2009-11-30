@@ -24,7 +24,7 @@ struct _Dataset {
     gsize  namelen;
     gchar *namebuf;
     IOMode mode;
-    IOOpenFlags oflags;
+    DSOpenFlags oflags;
     GHashTable *small_items;
     gboolean header_dirty;
 };
@@ -74,63 +74,49 @@ _ds_set_name_item (Dataset *ds, const char *item)
     strcpy (ds->namebuf + ds->namelen + 1, item);
 }
 
-Dataset *
-ds_open (const char *filename, IOMode mode, IOOpenFlags flags, GError **err)
+
+static gboolean
+_ds_truncate (Dataset *ds, GError **err)
 {
-    Dataset *ds;
+    gboolean retval = TRUE;
+    GDir *dir;
+    const gchar *diritem;
+
+    _ds_set_name_dir (ds);
+
+    if ((dir = g_dir_open (ds->namebuf, 0, err)) == NULL)
+	return TRUE;
+
+    while ((diritem = g_dir_read_name (dir)) != NULL) {
+	gchar *full = g_strdup_printf ("%s/%s", ds->namebuf, diritem);
+
+	if (unlink (full)) {
+	    IO_ERRNO_ERRV (err, errno, "Failed to unlink item file \"%s\"",
+			   full);
+	    g_free (full);
+	    goto bail;
+	}
+
+	g_free (full);
+    }
+
+    retval = FALSE;
+bail:
+    g_dir_close (dir);
+    return retval;
+}
+
+
+static gboolean
+_ds_read_header (Dataset *ds, GError **err)
+{
+    gboolean retval = TRUE;
     IOStream *hio;
     GError *suberr;
     gsize nread;
     DSHeaderItem *hitem;
 
-    g_return_val_if_fail (filename != NULL, NULL);
-    g_return_val_if_fail (mode == IO_MODE_READ, NULL);
-
-    if (mode & IO_MODE_READ) {
-	/* This isn't a fully comprehensive test, and as always it is
-	 * subject to races. We'll have a better idea of whether this
-	 * DS is ok when we try to read in the header. */
-
-	if (!g_file_test (filename, G_FILE_TEST_IS_DIR)) {
-	    g_set_error (err, G_FILE_ERROR, G_FILE_ERROR_NOTDIR,
-			 "Cannot open the dataset \"%s\" since it "
-			 "does not exist or is not a directory.", filename);
-	    return NULL;
-	}
-    }
-
-
-#if 0
-    {
-	if (g_file_test (filename, G_FILE_TEST_EXISTS)) {
-	    g_set_error (err, G_FILE_ERROR, G_FILE_ERROR_EXIST,
-			 "Cannot create the dataset \"%s\" since a "
-			 "file of that name already exists.", filename);
-	    return NULL;
-	}
-
-	if (mkdir (filename, 0755)) {
-	    IO_ERRNO_ERRV (err, errno, "Failed to create dataset "
-			  "directory \"%s\"", filename);
-	    return NULL;
-	}
-    }
-#endif
-
-    ds = g_new0 (Dataset, 1);
-    ds->namelen = strlen (filename);
-    ds->namebuf = g_new (gchar, ds->namelen + DS_ITEMNAME_MAXLEN + 2);
-    strcpy (ds->namebuf, filename);
-    ds->mode = mode;
-    ds->oflags = flags;
-    ds->header_dirty = FALSE;
-    ds->small_items = g_hash_table_new_full (g_str_hash,
-					     g_str_equal,
-					     NULL, g_free);
-
-    /* Read in that thar header */
-
-    if ((hio = ds_open_large_item (ds, "header", IO_MODE_READ, flags, err)) == NULL)
+    if ((hio = ds_open_large_item (ds, "header", IO_MODE_READ, 0, err)) == NULL)
 	goto bail;
 
     while ((nread = io_read_into_temp_buf (hio, DS_HEADER_RECSIZE,
@@ -230,12 +216,83 @@ ds_open (const char *filename, IOMode mode, IOOpenFlags flags, GError **err)
 	    goto bail;
 	}
     }
-	    
+
+    retval = FALSE;
+bail:
+    if (io_close_and_free (hio, err))
+	retval = TRUE;
+    return retval;
+}
+
+Dataset *
+ds_open (const char *filename, IOMode mode, DSOpenFlags flags, GError **err)
+{
+    Dataset *ds;
+    gboolean created = FALSE;
+
+    g_return_val_if_fail (filename != NULL, NULL);
+    g_return_val_if_fail (mode & IO_MODE_READ, NULL);
+
+    if ((mode & IO_MODE_WRITE) && (flags & DS_OFLAGS_EXIST_BAD)) {
+	flags |= DS_OFLAGS_CREATE_OK;
+
+	if (g_file_test (filename, G_FILE_TEST_EXISTS)) {
+	    g_set_error (err, G_FILE_ERROR, G_FILE_ERROR_EXIST,
+			 "Error creating dataset \"%s\": a "
+			 "file of that name already exists.", filename);
+	    return NULL;
+	}
+    }
+
+    if ((mode & IO_MODE_WRITE) && (flags & DS_OFLAGS_CREATE_OK)) {
+	/* Just go ahead and try to create the directory since it
+	 * will need to exist. If we don't get EEXIST or success,
+	 * there's gonna be a problem anyway. */
+	if (mkdir (filename, 0755) == 0)
+	    created = TRUE;
+	else {
+	    if (errno != EEXIST) {
+		IO_ERRNO_ERR (err, errno, "Couldn't create dataset directory");
+		return NULL;
+	    }
+	}
+    } else {
+	/* This isn't a fully comprehensive test, and as always it is
+	 * subject to races. We'll have a better idea of whether this
+	 * DS is ok when we try to read in the header. */
+
+	if (!g_file_test (filename, G_FILE_TEST_IS_DIR)) {
+	    g_set_error (err, G_FILE_ERROR, G_FILE_ERROR_NOTDIR,
+			 "Cannot open the dataset \"%s\" since it "
+			 "does not exist or is not a directory.", filename);
+	    return NULL;
+	}
+    }
+
+    ds = g_new0 (Dataset, 1);
+    ds->namelen = strlen (filename);
+    ds->namebuf = g_new (gchar, ds->namelen + DS_ITEMNAME_MAXLEN + 2);
+    strcpy (ds->namebuf, filename);
+    ds->mode = mode;
+    ds->oflags = flags;
+    ds->header_dirty = FALSE;
+    ds->small_items = g_hash_table_new_full (g_str_hash,
+					     g_str_equal,
+					     NULL, g_free);
+
+    if (!created) {
+	if ((mode & IO_MODE_WRITE) && (flags & DS_OFLAGS_TRUNCATE)) {
+	    if (_ds_truncate (ds, err))
+		goto bail;
+	} else {
+	    if (_ds_read_header (ds, err))
+		goto bail;
+	}
+    }
+
     return ds;
 
 bail:
-    if (hio != NULL)
-	io_close_and_free (hio, NULL);
     ds_close (ds, NULL);
     return NULL;
 }
@@ -252,7 +309,7 @@ ds_write_header (Dataset *ds, GError **err)
     g_assert (ds->mode & IO_MODE_WRITE);
 
     hio = ds_open_large_item (ds, "header", IO_MODE_WRITE,
-			      IO_OFLAGS_TRUNCATE | IO_OFLAGS_CREATE_OK, err);
+			      DS_OFLAGS_TRUNCATE | DS_OFLAGS_CREATE_OK, err);
     if (hio == NULL)
 	return TRUE;
 
@@ -380,6 +437,7 @@ ds_list_items (Dataset *ds, GError **err)
 	items = g_slist_prepend (items, g_strdup (diritem));
     }
 
+    g_dir_close (dir);
     g_hash_table_iter_init (&hiter, ds->small_items);
 
     while (g_hash_table_iter_next (&hiter, (gpointer *) &diritem, 
@@ -391,22 +449,34 @@ ds_list_items (Dataset *ds, GError **err)
 
 IOStream *
 ds_open_large_item (Dataset *ds, const gchar *name, IOMode mode,
-		    IOOpenFlags flags, GError **err)
+		    DSOpenFlags flags, GError **err)
 {
     /* Note: this function is called in ds_open to read the header, so
      * keep in mind that ds may not be fully initialized. */
 
     int fd, oflags = 0;
 
-    if (mode == IO_MODE_READ) {
+    switch (mode) {
+    case IO_MODE_READ:
 	oflags = O_RDONLY;
-    } else if (mode == IO_MODE_WRITE) {
+	break;
+    case IO_MODE_WRITE:
 	oflags = O_WRONLY;
 
-	if (flags & IO_OFLAGS_CREATE_OK)
+	if (flags & DS_OFLAGS_CREATE_OK)
 	    oflags |= O_CREAT;
-	if (flags & IO_OFLAGS_TRUNCATE)
+	if (flags & DS_OFLAGS_EXIST_BAD)
+	    oflags |= O_CREAT | O_EXCL;
+	if (flags & DS_OFLAGS_TRUNCATE)
 	    oflags |= O_TRUNC;
+	else if (flags & DS_OFLAGS_APPEND)
+	    oflags |= O_APPEND;
+	else
+	    g_assert_not_reached ();
+	break;
+    default:
+	/* Simultaneous read-write not allowed. */
+	g_assert_not_reached ();
     }
 
     _ds_set_name_item (ds, name);
@@ -644,7 +714,11 @@ ds_set_small_item (Dataset *ds, const gchar *name, DSType type, gsize nvals,
 
     small = (DSSmallItem *) g_hash_table_lookup (ds->small_items, name);
 
-    if (small == NULL) {
+    if (small != NULL) {
+	/* Can't modify existing items in append mode. */
+	if (ds->oflags & DS_OFLAGS_APPEND)
+	    return TRUE;
+    } else {
 	if (!create_ok)
 	    return TRUE;
 
