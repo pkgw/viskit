@@ -50,7 +50,7 @@ typedef struct _DSSmallItem {
     } vals;
 } DSSmallItem;
 
-#define DSI_DATA(small) ((gpointer) &(small->vals.i8[0]))
+#define DSI_DATA(small) ((gpointer) small->vals.i8)
 
 GQuark
 ds_error_quark (void)
@@ -255,6 +255,71 @@ ds_close (Dataset *ds)
 
     g_free (ds);
 }
+
+
+static gboolean
+_ds_write_header (Dataset *ds, GError **err)
+{
+    IOStream *hio;
+    GHashTableIter hiter;
+    DSSmallItem *small;
+    gboolean retval = TRUE;
+
+    hio = ds_open_large_item (ds, "header", IO_MODE_WRITE,
+			      IO_OFLAGS_TRUNCATE | IO_OFLAGS_CREATE_OK, err);
+    if (hio == NULL)
+	return TRUE;
+
+    g_hash_table_iter_init (&hiter, ds->small_items);
+
+    while (g_hash_table_iter_next (&hiter, (gpointer *) &small, NULL)) {
+	DSHeaderItem hitem;
+	guint8 dsize;
+	gint32 typecode;
+
+	if (io_nudge_align (hio, DS_HEADER_RECSIZE, err))
+	    goto bail;
+
+	/* The header */
+
+	memset (&hitem, 0, sizeof (hitem));
+	strcpy (hitem.name, small->name);
+	dsize = small->nvals * ds_type_sizes[small->type];
+	if (dsize != 0) {
+	    dsize += 4 % ds_type_aligns[small->type]; /* alignment */
+	    dsize += 4; /* type code */
+	}
+	hitem.alen = dsize;
+
+	if (io_write_raw (hio, sizeof (hitem), &hitem, err))
+	    goto bail;
+
+	if (dsize == 0)
+	    continue;
+
+	typecode = small->type;
+	if (typecode == DST_TEXT)
+	    /* Annoying dataset format quirk. */
+	    typecode = DST_I8;
+	typecode = GINT32_FROM_BE (typecode);
+	if (io_write_raw (hio, 4, &typecode, err))
+	    goto bail;
+
+	if (io_nudge_align (hio, ds_type_aligns[small->type], err))
+	    goto bail;
+
+	if (io_write_typed (hio, small->type, small->nvals,
+			    DSI_DATA (small), err))
+	    goto bail;
+    }
+
+    retval = FALSE;
+bail:
+    if (io_close_and_free (hio, err))
+	return TRUE;
+    return retval;
+}
+
 
 gboolean
 ds_has_item (Dataset *ds, const gchar *name)
