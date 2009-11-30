@@ -295,6 +295,7 @@ _io_read (IOStream *io, GError **err)
 gssize
 io_read_into_temp_buf (IOStream *io, gsize nbytes, gpointer *dest, GError **err)
 {
+    g_assert (io->mode == IO_MODE_READ);
     /* disallow this situation for now. */
     g_assert (nbytes <= io->bufsz);
 
@@ -378,6 +379,7 @@ io_read_into_temp_buf_typed (IOStream *io, DSType type, gsize nvals, gpointer *d
 {
     gssize retval;
 
+    g_assert (io->mode == IO_MODE_READ);
     g_assert (dest != NULL);
 
     retval = io_read_into_temp_buf (io, nvals * ds_type_sizes[type], dest, err);
@@ -395,6 +397,7 @@ io_read_into_user_buf (IOStream *io, DSType type, gsize nvals, gpointer buf,
 {
     gsize nbytes, ninbuf;
 
+    g_assert (io->mode == IO_MODE_READ);
     g_assert (buf != NULL);
 
     nbytes = nvals * ds_type_sizes[type];
@@ -479,6 +482,8 @@ gboolean
 io_nudge_align (IOStream *io, gsize align_size, GError **err)
 {
     gsize n = io->s.read.curpos % align_size;
+
+    g_assert (io->mode == IO_MODE_READ);
 
     if (n == 0)
 	return FALSE;
