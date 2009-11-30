@@ -11,6 +11,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <ctype.h> /*isprint etc*/
+#include <stdio.h> /*rename*/
 
 /* Note that these limits are set by the file format and MUST NOT be
  * changed by the user. Doing so will break compatibility with the
@@ -54,7 +55,12 @@ typedef struct _DSSmallItem {
 
 static IOStream *_ds_open_large_item_full (Dataset *ds, const gchar *name,
 					   IOMode mode, DSOpenFlags flags,
-					   gboolean trunc_ok, GError **err);
+					   gboolean trunc_ok, gboolean check_name,
+					   GError **err);
+static gboolean _ds_item_name_ok (const gchar *name);
+static gboolean _ds_rename_large_item_full (Dataset *ds, const gchar *oldname,
+					    const gchar *newname, gboolean check_new_name,
+					    GError **err);
 
 GQuark
 ds_error_quark (void)
@@ -275,7 +281,9 @@ ds_open (const char *filename, IOMode mode, DSOpenFlags flags, GError **err)
 
     ds = g_new0 (Dataset, 1);
     ds->namelen = strlen (filename);
-    ds->namebuf = g_new (gchar, ds->namelen + DS_ITEMNAME_MAXLEN + 2);
+    /* The + 8 is padding to allow for temporary illegal item names when,
+     * e.g., rewriting certain items. */
+    ds->namebuf = g_new (gchar, ds->namelen + DS_ITEMNAME_MAXLEN + 2 + 8);
     strcpy (ds->namebuf, filename);
     ds->mode = mode;
     ds->oflags = flags;
@@ -302,19 +310,59 @@ bail:
 }
 
 
+static gboolean
+_ds_rename_large_item_full (Dataset *ds, const gchar *oldname, const gchar *newname,
+			    gboolean check_new_name, GError **err)
+{
+    gchar *oldpath, *newpath;
+    gboolean retval = FALSE;
+
+    g_assert (ds->mode & IO_MODE_WRITE);
+
+    if (check_new_name && !_ds_item_name_ok (newname))
+	return TRUE;
+
+    _ds_set_name_dir (ds);
+    oldpath = g_strdup_printf ("%s/%s", ds->namebuf, oldname);
+    newpath = g_strdup_printf ("%s/%s", ds->namebuf, newname);
+    if (rename (oldpath, newpath)) {
+	IO_ERRNO_ERRV (err, errno, "Failed to rename \"%s\" -> \"%s\"",
+		       oldpath, newpath);
+	retval = TRUE;
+    }
+    g_free (oldpath);
+    g_free (newpath);
+    return retval;
+}
+
+
+gboolean
+ds_rename_large_item (Dataset *ds, const gchar *oldname, const gchar *newname,
+		      GError **err)
+{
+    g_assert (ds->mode & IO_MODE_WRITE);
+
+    if (!_ds_item_name_ok (newname))
+	return TRUE;
+
+    return _ds_rename_large_item_full (ds, oldname, newname, TRUE, err);
+}
+
+
 gboolean
 ds_write_header (Dataset *ds, GError **err)
 {
     IOStream *hio;
     GHashTableIter hiter;
     DSSmallItem *small;
-    gboolean retval = TRUE;
 
     g_assert (ds->mode & IO_MODE_WRITE);
 
-    hio = _ds_open_large_item_full (ds, "header", IO_MODE_WRITE,
+    /* Write out new header alongside old one */
+
+    hio = _ds_open_large_item_full (ds, "header+new", IO_MODE_WRITE,
 				    DS_OFLAGS_TRUNCATE | DS_OFLAGS_CREATE_OK,
-				    TRUE, err);
+				    TRUE, FALSE, err);
     if (hio == NULL)
 	return TRUE;
 
@@ -361,12 +409,20 @@ ds_write_header (Dataset *ds, GError **err)
 	    goto bail;
     }
 
-    ds->header_dirty = FALSE;
-    retval = FALSE;
-bail:
     if (io_close_and_free (hio, err))
 	return TRUE;
-    return retval;
+
+    /* Move it into place */
+
+    if (_ds_rename_large_item_full (ds, "header+new", "header", FALSE, err))
+	return TRUE;
+
+    ds->header_dirty = FALSE;
+    return FALSE;
+
+bail:
+    io_close_and_free (hio, NULL);
+    return TRUE;
 }
 
 
@@ -454,7 +510,8 @@ ds_list_items (Dataset *ds, GError **err)
 
 static IOStream *
 _ds_open_large_item_full (Dataset *ds, const gchar *name, IOMode mode,
-			  DSOpenFlags flags, gboolean trunc_ok, GError **err)
+			  DSOpenFlags flags, gboolean trunc_ok,
+			  gboolean check_name, GError **err)
 {
     /* Note: this function is called in ds_open to read the header, so
      * keep in mind that ds may not be fully initialized. */
@@ -468,10 +525,18 @@ _ds_open_large_item_full (Dataset *ds, const gchar *name, IOMode mode,
     case IO_MODE_WRITE:
 	oflags = O_WRONLY;
 
-	if (flags & DS_OFLAGS_CREATE_OK)
+	if (flags & DS_OFLAGS_CREATE_OK) {
 	    oflags |= O_CREAT;
-	if (flags & DS_OFLAGS_EXIST_BAD)
+	    if (check_name && !_ds_item_name_ok (name))
+		return NULL;
+	}
+
+	if (flags & DS_OFLAGS_EXIST_BAD) {
 	    oflags |= O_CREAT | O_EXCL;
+	    if (check_name && !_ds_item_name_ok (name))
+		return NULL;
+	}
+
 	if (flags & DS_OFLAGS_TRUNCATE) {
 	    if (ds->oflags & DS_OFLAGS_APPEND && !trunc_ok)
 		return NULL;
@@ -506,7 +571,7 @@ IOStream *
 ds_open_large_item (Dataset *ds, const gchar *name, IOMode mode,
 		    DSOpenFlags flags, GError **err)
 {
-    return _ds_open_large_item_full (ds, name, mode, flags, FALSE, err);
+    return _ds_open_large_item_full (ds, name, mode, flags, FALSE, TRUE, err);
 }
 
 static gboolean
@@ -685,7 +750,7 @@ ds_get_item_small_string (Dataset *ds, const gchar *name)
     return g_strndup (small->vals.text, small->nvals);
 }
 
-gboolean
+static gboolean
 _ds_item_name_ok (const gchar *name)
 {
     size_t l;

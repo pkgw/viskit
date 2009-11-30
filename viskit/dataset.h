@@ -97,6 +97,9 @@ extern gboolean ds_set_small_item (Dataset *ds, const gchar *name, DSType type,
 #define ds_set_small_item_string(ds, name, value, create_ok) \
     ds_set_small_item ((ds), (name), DST_I8, strlen (value), (value), (create_ok))
 
+extern gboolean ds_rename_large_item (Dataset *ds, const gchar *oldname,
+				      const gchar *newname, GError **err);
+
 extern gboolean ds_write_header (Dataset *ds, GError **err);
 
 #endif
