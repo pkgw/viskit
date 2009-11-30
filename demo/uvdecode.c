@@ -76,6 +76,6 @@ main (int argc, char **argv)
     }
 
     uvr_free (uvr);
-    ds_close (ds);
+    ds_close (ds, NULL);
     return 0;
 }

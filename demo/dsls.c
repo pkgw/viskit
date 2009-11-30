@@ -86,6 +86,6 @@ main (int argc, char **argv)
     }
 
     g_slist_free (items);
-    ds_close (ds);
+    ds_close (ds, NULL);
     return 0;
 }

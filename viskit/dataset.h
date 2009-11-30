@@ -30,7 +30,7 @@ typedef struct _DSItemInfo {
 extern Dataset *ds_open (const char *filename, IOMode mode, IOOpenFlags flags,
 			 GError **err)
     G_GNUC_WARN_UNUSED_RESULT;
-extern void ds_close (Dataset *ds);
+extern gboolean ds_close (Dataset *ds, GError **err);
 
 extern gboolean ds_has_item (Dataset *ds, const gchar *name);
 extern GSList *ds_list_items (Dataset *ds, GError **err)
@@ -59,5 +59,7 @@ extern gboolean ds_set_small_item (Dataset *ds, const gchar *name, DSType type,
     ds_set_small_item ((ds), (name), DST_F64, 1, &((gdouble) (value)), (create_ok))
 #define ds_set_small_item_string(ds, name, value, create_ok) \
     ds_set_small_item ((ds), (name), DST_I8, strlen (value), (value), (create_ok))
+
+extern gboolean ds_write_header (Dataset *ds, GError **err);
 
 #endif

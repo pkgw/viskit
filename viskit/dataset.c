@@ -236,34 +236,20 @@ ds_open (const char *filename, IOMode mode, IOOpenFlags flags, GError **err)
 bail:
     if (hio != NULL)
 	io_close_and_free (hio, NULL);
-    ds_close (ds);
+    ds_close (ds, NULL);
     return NULL;
 }
 
-void
-ds_close (Dataset *ds)
-{
-    if (ds->namebuf != NULL) {
-	g_free (ds->namebuf);
-	ds->namebuf = NULL;
-    }
 
-    if (ds->small_items) {
-	g_free (ds->small_items);
-	ds->small_items = NULL;
-    }
-
-    g_free (ds);
-}
-
-
-static gboolean
-_ds_write_header (Dataset *ds, GError **err)
+gboolean
+ds_write_header (Dataset *ds, GError **err)
 {
     IOStream *hio;
     GHashTableIter hiter;
     DSSmallItem *small;
     gboolean retval = TRUE;
+
+    g_assert (ds->mode & IO_MODE_WRITE);
 
     hio = ds_open_large_item (ds, "header", IO_MODE_WRITE,
 			      IO_OFLAGS_TRUNCATE | IO_OFLAGS_CREATE_OK, err);
@@ -313,10 +299,38 @@ _ds_write_header (Dataset *ds, GError **err)
 	    goto bail;
     }
 
+    ds->header_dirty = FALSE;
     retval = FALSE;
 bail:
     if (io_close_and_free (hio, err))
 	return TRUE;
+    return retval;
+}
+
+
+gboolean
+ds_close (Dataset *ds, GError **err)
+{
+    gboolean retval = FALSE;
+
+    if (ds == NULL)
+	return FALSE;
+
+    if (ds->header_dirty)
+	if (ds_write_header (ds, err))
+	    retval = TRUE;
+
+    if (ds->namebuf != NULL) {
+	g_free (ds->namebuf);
+	ds->namebuf = NULL;
+    }
+
+    if (ds->small_items) {
+	g_free (ds->small_items);
+	ds->small_items = NULL;
+    }
+
+    g_free (ds);
     return retval;
 }
 
@@ -645,5 +659,6 @@ ds_set_small_item (Dataset *ds, const gchar *name, DSType type, gsize nvals,
     small->type = type;
     small->nvals = nvals;
     memcpy (DSI_DATA (small), data, nvals * ds_type_sizes[type]);
+    ds->header_dirty = TRUE;
     return FALSE;
 }
