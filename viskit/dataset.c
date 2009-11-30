@@ -317,18 +317,31 @@ ds_open_large_item (Dataset *ds, const gchar *name, IOMode mode,
     /* Note: this function is called in ds_open to read the header, so
      * keep in mind that ds may not be fully initialized. */
 
-    int fd;
+    int fd, oflags = 0;
 
-    g_assert (mode == IO_MODE_READ); /* FIXME */
+    if (mode == IO_MODE_READ) {
+	oflags = O_RDONLY;
+    } else if (mode == IO_MODE_WRITE) {
+	oflags = O_WRONLY;
+
+	if (flags & IO_OFLAGS_CREATE_OK)
+	    oflags |= O_CREAT;
+	if (flags & IO_OFLAGS_TRUNCATE)
+	    oflags |= O_TRUNC;
+    }
 
     _ds_set_name_item (ds, name);
-    fd = open (ds->namebuf, O_RDONLY); /* FIXME */
+    fd = open (ds->namebuf, oflags, 0644);
 
     if (fd < 0) {
 	IO_ERRNO_ERRV (err, errno, "Failed to open item file \"%s\"",
 		       ds->namebuf);
 	return NULL;
     }
+
+    /* FIXME: if opening for write and not truncating, we should
+     * figure out the alignment hint ... and prefill the write
+     * buffer :-( */
 
     return io_new_from_fd (mode, fd, 0, 0);
 }
