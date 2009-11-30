@@ -57,7 +57,7 @@ static IOStream *_ds_open_large_item_full (Dataset *ds, const gchar *name,
 					   IOMode mode, DSOpenFlags flags,
 					   gboolean trunc_ok, gboolean check_name,
 					   GError **err);
-static gboolean _ds_item_name_ok (const gchar *name);
+static gboolean _ds_item_name_ok (const gchar *name, GError **err);
 static gboolean _ds_rename_large_item_full (Dataset *ds, const gchar *oldname,
 					    const gchar *newname, gboolean check_new_name,
 					    GError **err);
@@ -319,7 +319,7 @@ _ds_rename_large_item_full (Dataset *ds, const gchar *oldname, const gchar *newn
 
     g_assert (ds->mode & IO_MODE_WRITE);
 
-    if (check_new_name && !_ds_item_name_ok (newname))
+    if (check_new_name && !_ds_item_name_ok (newname, err))
 	return TRUE;
 
     _ds_set_name_dir (ds);
@@ -342,7 +342,7 @@ ds_rename_large_item (Dataset *ds, const gchar *oldname, const gchar *newname,
 {
     g_assert (ds->mode & IO_MODE_WRITE);
 
-    if (!_ds_item_name_ok (newname))
+    if (!_ds_item_name_ok (newname, err))
 	return TRUE;
 
     return _ds_rename_large_item_full (ds, oldname, newname, TRUE, err);
@@ -488,7 +488,7 @@ ds_list_items (Dataset *ds, GError **err)
 	    continue;
 
 	if (g_hash_table_lookup (ds->small_items, diritem) != NULL) {
-	    g_set_error (err, G_FILE_ERROR, G_FILE_ERROR_INVAL,
+	    g_set_error (err, DS_ERROR, DS_ERROR_FORMAT,
 			 "Invalid dataset: item %s has both file "
 			 "and header entry.", diritem);
 	    g_slist_foreach (items, (GFunc) g_free, NULL);
@@ -525,21 +525,21 @@ _ds_open_large_item_full (Dataset *ds, const gchar *name, IOMode mode,
     case IO_MODE_WRITE:
 	oflags = O_WRONLY;
 
-	if (flags & DS_OFLAGS_CREATE_OK) {
+	if (flags & DS_OFLAGS_CREATE_OK)
 	    oflags |= O_CREAT;
-	    if (check_name && !_ds_item_name_ok (name))
-		return NULL;
-	}
 
-	if (flags & DS_OFLAGS_EXIST_BAD) {
+	if (flags & DS_OFLAGS_EXIST_BAD)
 	    oflags |= O_CREAT | O_EXCL;
-	    if (check_name && !_ds_item_name_ok (name))
-		return NULL;
-	}
+
+	if ((oflags & O_CREAT) && check_name && !_ds_item_name_ok (name, err))
+	    return NULL;
 
 	if (flags & DS_OFLAGS_TRUNCATE) {
-	    if (ds->oflags & DS_OFLAGS_APPEND && !trunc_ok)
+	    if (ds->oflags & DS_OFLAGS_APPEND && !trunc_ok) {
+		g_set_error (err, DS_ERROR, DS_ERROR_INTERNAL_PERMS, "Cannot "
+			     "truncate item \"%s\" with dataset in append mode", name);
 		return NULL;
+	    }
 	    oflags |= O_TRUNC;
 	} else if (flags & DS_OFLAGS_APPEND)
 	    oflags |= O_APPEND;
@@ -751,58 +751,63 @@ ds_get_item_small_string (Dataset *ds, const gchar *name)
 }
 
 static gboolean
-_ds_item_name_ok (const gchar *name)
+_ds_item_name_ok (const gchar *name, GError **err)
 {
-    size_t l;
+    size_t len;
     int i;
 
     g_return_val_if_fail (name != NULL, FALSE);
 
-    l = strlen (name);
+    len = strlen (name);
 
-    if (l < 1 || l > 8)
-	return FALSE;
+    if (len < 1 || len > 8)
+	goto invalid;
 
-    if (l == 6 && strcmp (name, "header") == 0)
-	return FALSE;
+    if (len == 6 && strcmp (name, "header") == 0)
+	goto invalid;
 
     if (!islower (name[0]))
-	return FALSE;
+	goto invalid;
 
-    for (i = 1; i < l; i++) {
+    for (i = 1; i < len; i++) {
 	int c = (int) name[i];
 
 	if (!(islower (c) || isdigit (c) || c == '-' || c == '_'))
-	    return FALSE;
+	    goto invalid;
     }
 
     return TRUE;
+
+invalid:
+    g_set_error (err, DS_ERROR, DS_ERROR_ITEM_NAME,
+		 "Bad item name \"%s\"", name);
+    return FALSE;
 }
 
-gboolean
+DSError
 ds_set_small_item (Dataset *ds, const gchar *name, DSType type, gsize nvals,
 		   gpointer data, gboolean create_ok)
 {
     DSSmallItem *small;
 
     if (!(ds->mode & IO_MODE_WRITE))
-	return TRUE;
+	return DS_ERROR_INTERNAL_PERMS;
 
     if (nvals * ds_type_sizes[type] > 64)
-	return TRUE;
+	return DS_ERROR_FORMAT;
 
     small = (DSSmallItem *) g_hash_table_lookup (ds->small_items, name);
 
     if (small != NULL) {
 	/* Can't modify existing items in append mode. */
 	if (ds->oflags & DS_OFLAGS_APPEND)
-	    return TRUE;
+	    return DS_ERROR_INTERNAL_PERMS;
     } else {
 	if (!create_ok)
-	    return TRUE;
+	    return DS_ERROR_NONEXISTANT;
 
-	if (!_ds_item_name_ok (name))
-	    return TRUE;
+	if (!_ds_item_name_ok (name, NULL))
+	    return DS_ERROR_ITEM_NAME;
 
 	small = g_new0 (DSSmallItem, 1);
 	strcpy (small->name, name);
@@ -813,5 +818,5 @@ ds_set_small_item (Dataset *ds, const gchar *name, DSType type, gsize nvals,
     small->nvals = nvals;
     memcpy (DSI_DATA (small), data, nvals * ds_type_sizes[type]);
     ds->header_dirty = TRUE;
-    return FALSE;
+    return DS_ERROR_NO_ERROR;
 }

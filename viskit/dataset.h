@@ -51,7 +51,11 @@ typedef enum _DSOpenFlags {
 extern GQuark ds_error_quark (void);
 
 typedef enum _DSError {
-    DS_ERROR_FORMAT = 0
+    DS_ERROR_NO_ERROR = 0,
+    DS_ERROR_FORMAT = 1,
+    DS_ERROR_INTERNAL_PERMS = 2,
+    DS_ERROR_ITEM_NAME = 3,
+    DS_ERROR_NONEXISTANT = 4,
 } DSError;
 
 
@@ -81,8 +85,8 @@ extern gboolean ds_get_item_i64 (Dataset *ds, const gchar *name, gint64 *val);
 extern gboolean ds_get_item_f64 (Dataset *ds, const gchar *name, gdouble *val);
 extern gchar *ds_get_item_small_string (Dataset *ds, const gchar *name);
 
-extern gboolean ds_set_small_item (Dataset *ds, const gchar *name, DSType type,
-				   gsize nvals, gpointer data, gboolean create_ok);
+extern DSError ds_set_small_item (Dataset *ds, const gchar *name, DSType type,
+				  gsize nvals, gpointer data, gboolean create_ok);
 
 #define ds_set_small_item_i16(ds, name, value, create_ok) \
     ds_set_small_item ((ds), (name), DST_I16, 1, &((gint16) (value)), (create_ok))
