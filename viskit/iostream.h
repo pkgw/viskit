@@ -4,7 +4,22 @@
 #include <glib.h>
 #include <viskit/types.h>
 
-typedef struct _InputStream InputStream;
+typedef struct _IOStream IOStream;
+
+typedef enum _IOMode {
+    IO_MODE_READ       = 1 << 0,
+    IO_MODE_WRITE      = 1 << 1,
+    IO_MODE_READ_WRITE = IO_MODE_READ | IO_MODE_WRITE,
+} IOMode;
+
+typedef enum _IOOpenFlags {
+    /* If opening for write and doesn't exist, CREATE_OK specifies whether
+     * to create the item. If opening for write and does exist, TRUNCATE
+     * instructs to truncate the stream; otherwise, it is opened for
+     * appending. */
+    IO_OFLAGS_CREATE_OK = 1 << 0,
+    IO_OFLAGS_TRUNCATE  = 1 << 1,
+} IOOpenFlags;
 
 
 /* Dealing with endianness conversions */
@@ -20,16 +35,6 @@ extern void io_recode_data_inplace (gchar *data, DSType type, gsize nvals);
 
 /* The actual I/O routines */
 
-struct _InputStream {
-    int fd;
-    gsize bufsz;
-    gchar *rbuf;
-    gsize rpos; /* position of read cursor within buffer. */
-    gboolean reof; /* have we read to EOF? */
-    gsize rend; /* location of EOF within the buffer */
-    gchar *scratch; /* for block-crossing read requests. */
-};
-
 #define IO_ERRNO_ERR(err, errno, msg)					\
     g_set_error (err, G_FILE_ERROR, g_file_error_from_errno(errno),	\
 		 msg ": %s", g_strerror (errno))
@@ -37,18 +42,18 @@ struct _InputStream {
     g_set_error (err, G_FILE_ERROR, g_file_error_from_errno(errno),	\
 		 msg ": %s", rest, g_strerror (errno))
 
-extern void io_input_init (InputStream *io, gsize bufsz);
-extern void io_input_uninit (InputStream *io);
-extern InputStream *io_input_alloc (gsize bufsz);
-extern void io_input_free (InputStream *io);
+extern IOStream *io_new_from_fd (IOMode mode, int fd, gsize bufsz, goffset align_hint);
+extern void io_free (IOStream *io);
+extern gboolean io_close_and_free (IOStream *io, GError **err);
 
-extern gssize io_fetch_temp (InputStream *io, gsize nbytes, gchar **dest,
-			     GError **err);
-extern gssize io_fetch_temp_typed (InputStream *io, DSType type, gsize nvals,
-				   gpointer *dest, GError **err);
-extern gssize io_fetch_prealloc (InputStream *io, DSType type, gsize nvals,
-				 gpointer buf, GError **err);
-extern gboolean io_nudge_align (InputStream *io, gsize align_size, 
-				GError **err);
+extern int io_get_fd (IOStream *io);
+
+extern gssize io_read_into_temp_buf (IOStream *io, gsize nbytes, gpointer *dest,
+				     GError **err);
+extern gssize io_read_into_temp_buf_typed (IOStream *io, DSType type, gsize nvals,
+					   gpointer *dest, GError **err);
+extern gssize io_read_into_user_buf (IOStream *io, DSType type, gsize nvals,
+				     gpointer buf, GError **err);
+extern gboolean io_nudge_align (IOStream *io, gsize align_size, GError **err);
 
 #endif

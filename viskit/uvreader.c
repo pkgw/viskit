@@ -24,7 +24,7 @@ typedef struct _UVHeader {
 #define NUMVARS 256 
 
 struct _UVReader {
-    InputStream vd; /* visdata */
+    IOStream *vd; /* visdata */
 
     gint nvars;
     GHashTable *vars_by_name;
@@ -47,19 +47,17 @@ uvr_alloc (void)
     UVReader *uvr;
 
     uvr = g_new0 (UVReader, 1);
-    io_input_init (&(uvr->vd), 0);
+    /* No init needed beyond everything being zeroed. */
     return uvr;
 }
 
 void
 uvr_free (UVReader *uvr)
 {
-    if (uvr->vd.fd >= 0) {
-	close (uvr->vd.fd);
-	uvr->vd.fd = -1;
+    if (uvr->vd != NULL) {
+	io_close_and_free (uvr->vd, NULL);
+	uvr->vd = NULL;
     }
-
-    io_input_uninit (&(uvr->vd));
 
     if (uvr->vars_by_name != NULL) {
 	g_hash_table_destroy (uvr->vars_by_name);
@@ -72,7 +70,7 @@ uvr_free (UVReader *uvr)
 gboolean
 uvr_prep (UVReader *uvr, Dataset *ds, GError **err)
 {
-    InputStream vtab;
+    IOStream *vtab;
     gchar vtbuf[12]; /* char, space, 8 chars, newline, \0 */
     gchar *vtcur;
     int vtidx;
@@ -85,12 +83,11 @@ uvr_prep (UVReader *uvr, Dataset *ds, GError **err)
 
     /* Read in variable table */
 
-    io_input_init (&vtab, 0);
-    if (ds_open_large (ds, "vartable", DSM_READ, &vtab, err))
+    if ((vtab = ds_open_large_item (ds, "vartable", IO_MODE_READ, 0, err)) == NULL)
 	goto bail;
 
     vtidx = 0;
-    while ((nread = io_fetch_temp (&vtab, 1, &vtcur, err)) == 1) {
+    while ((nread = io_read_into_temp_buf (vtab, 1, (gpointer *) &vtcur, err)) == 1) {
 	if (*vtcur != '\n') {
 	    vtbuf[vtidx++] = *vtcur;
 
@@ -153,9 +150,8 @@ uvr_prep (UVReader *uvr, Dataset *ds, GError **err)
     if (nread < 0)
 	goto bail;
 
-    close (vtab.fd);
-    vtab.fd = -1;
-    io_input_uninit (&vtab);
+    if (io_close_and_free (vtab, err))
+	goto bail;
 
     /* FIXME: check for vartable not ending in newline */
 
@@ -163,16 +159,16 @@ uvr_prep (UVReader *uvr, Dataset *ds, GError **err)
 
     /* Open the visdata stream for reading. */
 
-    if (ds_open_large (ds, "visdata", DSM_READ, &(uvr->vd), err))
+    if ((uvr->vd = ds_open_large_item (ds, "visdata", IO_MODE_READ, 0, err)) == NULL)
 	goto bail;
 
     return FALSE;
 
 bail:
-    if (vtab.fd >= 0)
-	close (vtab.fd);
-    if (uvr->vd.fd >= 0)
-	close (uvr->vd.fd);
+    if (vtab != NULL)
+	io_close_and_free (vtab, err);
+    if (uvr->vd != NULL)
+	io_close_and_free (uvr->vd, err);
     return TRUE;
 }
 
@@ -213,7 +209,7 @@ uvr_next (UVReader *uvr, gpointer *data, GError **err)
     gint32 nbytes;
 
     *data = NULL;
-    nread = io_fetch_temp (&(uvr->vd), HSZ, (gpointer) &header, err);
+    nread = io_read_into_temp_buf (uvr->vd, HSZ, (gpointer *) &header, err);
 
     if (nread < 0)
 	return UVET_ERROR;
@@ -241,7 +237,7 @@ uvr_next (UVReader *uvr, gpointer *data, GError **err)
 
 	var = uvr->vars[varnum];
 
-	if ((nread = io_fetch_temp (&(uvr->vd), 4, &buf, err)) < 0)
+	if ((nread = io_read_into_temp_buf (uvr->vd, 4, (gpointer *) &buf, err)) < 0)
 	    return UVET_ERROR;
 
 	if (nread != 4) {
@@ -272,11 +268,11 @@ uvr_next (UVReader *uvr, gpointer *data, GError **err)
 
 	var = uvr->vars[varnum];
 
-	if (io_nudge_align (&(uvr->vd), ds_type_aligns[var->type], err))
+	if (io_nudge_align (uvr->vd, ds_type_aligns[var->type], err))
 	    return UVET_ERROR;
 
-	if ((nread = io_fetch_prealloc (&(uvr->vd), var->type, var->nvals,
-					var->data, err)) < 0)
+	if ((nread = io_read_into_user_buf (uvr->vd, var->type, var->nvals,
+					    var->data, err)) < 0)
 	    return UVET_ERROR;
 
 	if (nread != var->nvals) {
@@ -296,7 +292,7 @@ uvr_next (UVReader *uvr, gpointer *data, GError **err)
 	return UVET_ERROR;
     }
 
-    if (io_nudge_align (&(uvr->vd), VISDATA_ALIGN, err))
+    if (io_nudge_align (uvr->vd, VISDATA_ALIGN, err))
 	return UVET_ERROR;
 
     return etype;

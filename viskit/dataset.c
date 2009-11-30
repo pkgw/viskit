@@ -23,8 +23,10 @@
 struct _Dataset {
     gsize  namelen;
     gchar *namebuf;
-    DSMode mode;
+    IOMode mode;
+    IOOpenFlags oflags;
     GHashTable *small_items;
+    gboolean header_dirty;
 };
 
 typedef struct _DSHeaderItem {
@@ -63,7 +65,7 @@ _ds_set_name_dir (Dataset *ds)
 }
 
 void
-_ds_set_name_item (Dataset *ds, char *item)
+_ds_set_name_item (Dataset *ds, const char *item)
 {
     /* It's assumed here that we've sanitychecked
      * that @item is less than 8 characters long. */
@@ -73,18 +75,19 @@ _ds_set_name_item (Dataset *ds, char *item)
 }
 
 Dataset *
-ds_open (const char *filename, DSMode mode, GError **err)
+ds_open (const char *filename, IOMode mode, IOOpenFlags flags, GError **err)
 {
     Dataset *ds;
-    InputStream hio;
+    IOStream *hio;
     GError *suberr;
     gsize nread;
     DSHeaderItem *hitem;
 
     g_return_val_if_fail (filename != NULL, NULL);
-    g_return_val_if_fail (mode != DSM_APPEND, NULL);
+    g_return_val_if_fail (mode == IO_MODE_READ, NULL);
 
-    if (mode == DSM_CREATE) {
+#if 0
+    if (mode == IO_MODE_CREATE) {
 	if (g_file_test (filename, G_FILE_TEST_EXISTS)) {
 	    g_set_error (err, G_FILE_ERROR, G_FILE_ERROR_EXIST,
 			 "Cannot create the dataset \"%s\" since a "
@@ -109,24 +112,26 @@ ds_open (const char *filename, DSMode mode, GError **err)
 	    return NULL;
 	}
     }
+#endif
 
     ds = g_new0 (Dataset, 1);
     ds->namelen = strlen (filename);
     ds->namebuf = g_new (gchar, ds->namelen + DS_ITEMNAME_MAXLEN + 2);
     strcpy (ds->namebuf, filename);
     ds->mode = mode;
+    ds->oflags = flags;
+    ds->header_dirty = FALSE;
     ds->small_items = g_hash_table_new_full (g_str_hash,
 					     g_str_equal,
 					     NULL, g_free);
 
     /* Read in that thar header */
 
-    io_input_init (&hio, 0);
-    if (ds_open_large (ds, "header", DSM_READ, &hio, err))
+    if ((hio = ds_open_large_item (ds, "header", IO_MODE_READ, flags, err)) == NULL)
 	goto bail;
 
-    while ((nread = io_fetch_temp (&hio, DS_HEADER_RECSIZE,
-				   (gchar **) &hitem, &suberr)) > 0) {
+    while ((nread = io_read_into_temp_buf (hio, DS_HEADER_RECSIZE,
+					   (gpointer *) &hitem, &suberr)) > 0) {
 	gchar *data;
 	gsize ndata;
 	DSSmallItem *si;
@@ -171,7 +176,8 @@ ds_open (const char *filename, DSMode mode, GError **err)
 	    guint8 align;
 	    gsize dlen;
 
-	    ndata = io_fetch_temp (&hio, hitem->alen, &data, &suberr);
+	    ndata = io_read_into_temp_buf (hio, hitem->alen, (gpointer *) &data,
+					   &suberr);
 
 	    if (ndata < 0) {
 		g_propagate_error (err, suberr);
@@ -216,7 +222,7 @@ ds_open (const char *filename, DSMode mode, GError **err)
 	    g_hash_table_insert (ds->small_items, si->name, si);
 	}
 
-	if (io_nudge_align (&hio, DS_HEADER_RECSIZE, &suberr)) {
+	if (io_nudge_align (hio, DS_HEADER_RECSIZE, &suberr)) {
 	    g_propagate_error (err, suberr);
 	    goto bail;
 	}
@@ -225,10 +231,8 @@ ds_open (const char *filename, DSMode mode, GError **err)
     return ds;
 
 bail:
-    if (hio.fd >= 0)
-	close (hio.fd);
-
-    io_input_uninit (&hio);
+    if (hio != NULL)
+	io_close_and_free (hio, NULL);
     ds_close (ds);
     return NULL;
 }
@@ -250,7 +254,7 @@ ds_close (Dataset *ds)
 }
 
 gboolean
-ds_has_item (Dataset *ds, gchar *name)
+ds_has_item (Dataset *ds, const gchar *name)
 {
     g_return_val_if_fail (name != NULL, FALSE);
     g_return_val_if_fail (strlen (name) <= DS_ITEMNAME_MAXLEN,
@@ -303,32 +307,34 @@ ds_list_items (Dataset *ds, GError **err)
     return items;
 }
 
-gboolean
-ds_open_large (Dataset *ds, gchar *name, DSMode mode, InputStream *io, GError **err)
+IOStream *
+ds_open_large_item (Dataset *ds, const gchar *name, IOMode mode,
+		    IOOpenFlags flags, GError **err)
 {
     /* Note: this function is called in ds_open to read the header, so
      * keep in mind that ds may not be fully initialized. */
 
-    g_return_val_if_fail (io != NULL, TRUE);
-    g_assert (mode == DSM_READ); /* FIXME */
+    int fd;
+
+    g_assert (mode == IO_MODE_READ); /* FIXME */
 
     _ds_set_name_item (ds, name);
-    io->fd = open (ds->namebuf, O_RDONLY); /* FIXME */
+    fd = open (ds->namebuf, O_RDONLY); /* FIXME */
 
-    if (io->fd < 0) {
+    if (fd < 0) {
 	IO_ERRNO_ERRV (err, errno, "Failed to open item file \"%s\"",
 		       ds->namebuf);
-	return TRUE;
+	return NULL;
     }
 
-    return FALSE;
+    return io_new_from_fd (mode, fd, 0, 0);
 }
 
 static gboolean
-_ds_probe_large_item (Dataset *ds, gchar *name, DSType *type,
+_ds_probe_large_item (Dataset *ds, const gchar *name, DSType *type,
 		      gsize *nvals, GError **err)
 {
-    InputStream io;
+    IOStream *io;
     gssize nread;
     gchar *data;
     guint32 v;
@@ -340,17 +346,15 @@ _ds_probe_large_item (Dataset *ds, gchar *name, DSType *type,
     *nvals = 0;
     retval = TRUE;
 
-    io_input_init (&io, 0);
-
-    if (ds_open_large (ds, name, DSM_READ, &io, err))
+    if ((io = ds_open_large_item (ds, name, IO_MODE_READ, 0, err)) == NULL)
 	goto done;
 
-    if (fstat (io.fd, &statbuf)) {
+    if (fstat (io_get_fd (io), &statbuf)) {
 	IO_ERRNO_ERRV (err, errno, "Unable to stat dataset item \"%s\"", name);
 	goto done;
     }
 
-    nread = io_fetch_temp (&io, 4, &data, err);
+    nread = io_read_into_temp_buf (io, 4, (gpointer *) &data, err);
 
     if (nread < 0)
 	goto done;
@@ -407,15 +411,13 @@ _ds_probe_large_item (Dataset *ds, gchar *name, DSType *type,
     }
 
 done:
-    if (io.fd > 0)
-	close (io.fd);
-    io_input_uninit (&io);
+    io_close_and_free (io, NULL);
     return retval;
 }
 
 
 DSItemInfo *
-ds_probe_item (Dataset *ds, gchar *name, GError **err)
+ds_probe_item (Dataset *ds, const gchar *name, GError **err)
 {
     DSItemInfo *dii;
     DSSmallItem *small;

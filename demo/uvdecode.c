@@ -23,7 +23,7 @@ main (int argc, char **argv)
 	return 1;
     }
 
-    if ((ds = ds_open (argv[1], DSM_READ, &err)) == NULL) {
+    if ((ds = ds_open (argv[1], IO_MODE_READ, 0, &err)) == NULL) {
 	fprintf (stderr, "Error opening \"%s\": %s\n",
 		 argv[1], err->message);
 	return 1;

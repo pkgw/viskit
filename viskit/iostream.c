@@ -126,45 +126,123 @@ io_recode_data_inplace (gchar *data, DSType type, gsize nvals)
 
 /* Actual I/O operations. */
 
-void
-io_input_init (InputStream *io, gsize bufsz)
+struct _IOStream {
+    IOMode mode;
+    int fd;
+    gsize bufsz;
+
+    union {
+	struct {
+	    gchar *buf;
+	    gchar *scratch; /* for block-crossing read requests. */
+	    gsize curpos; /* position of read cursor within buffer. */
+	    gsize endpos; /* location of EOF within the buffer */
+	    gboolean eof; /* have we read to EOF? */
+	} read;
+    } s; /* short for "state" */
+};
+
+
+IOStream *
+io_new_from_fd (IOMode mode, int fd, gsize bufsz, goffset align_hint)
 {
+    IOStream *io;
+
     if (bufsz == 0)
 	bufsz = DEFAULT_BUFSZ;
 
+    /* align_hint will be used to tell the IOStream of the alignment of
+     * the FD handle within its stream. It's 0 if starting at the
+     * beginning of a file, but if we're appending one, for instance,
+     * it will be different. The align_hint should be reduced via modulus
+     * to a small-ish number, specifically one smaller than bufsz.
+     *
+     * FIXME: currently ignored.
+     */
+
+    g_assert (align_hint == 0); /* !!!! temporary */
+
     /* bufsz must be a multiple of a large power of 2, say 256 ... */
     g_assert ((bufsz & 0xFF) == 0);
+    g_assert (align_hint < bufsz);
+    g_assert (fd >= 0);
 
-    io->fd = -1;
+    io = g_new0 (IOStream, 1);
+    io->mode = mode;
+    io->fd = fd;
     io->bufsz = bufsz;
-    io->rbuf = g_new (gchar, bufsz * 2); /* Allocate the two buffers as one block. */
-    io->scratch = io->rbuf + bufsz;
-    io->reof = FALSE;
-    io->rend = 0;
-    io->rpos = bufsz; /* Forces a block to be read on first fetch */
-}
 
-void
-io_input_uninit (InputStream *io)
-{
-    g_free (io->rbuf);
-    io->rbuf = io->scratch = NULL;
-}
+    switch (mode) {
+    case IO_MODE_READ:
+	/* Allocate the two buffers as one block. */
+	io->s.read.buf = g_new (gchar, bufsz * 2);
+	io->s.read.scratch = io->s.read.buf + bufsz;
+	io->s.read.eof = FALSE;
+	io->s.read.curpos = bufsz; /* Forces a block to be read on first read */
+	io->s.read.endpos = 0;
+	break;
+    case IO_MODE_WRITE:
+	/* handle write stream */
+	g_assert (0);
+	break;
+    default:
+	/* Unsupported stream mode: we only do read or write but not both. */
+	g_assert_not_reached ();
+	break;
+    }
 
-InputStream *
-io_input_alloc (gsize bufsz)
-{
-    InputStream *io = g_new0 (InputStream, 1);
-    io_input_init (io, bufsz);
     return io;
 }
 
+
 void
-io_input_free (InputStream *io)
+io_free (IOStream *io)
 {
-    io_input_uninit (io);
+    switch (io->mode) {
+    case IO_MODE_READ:
+	g_free (io->s.read.buf);
+	io->s.read.buf = NULL;
+	io->s.read.scratch = NULL;
+	break;
+    case IO_MODE_WRITE:
+	/* handle write stream */
+	g_assert (0);
+	break;
+    default:
+	g_assert_not_reached ();
+	break;
+    }
+
     g_free (io);
 }
+
+
+gboolean
+io_close_and_free (IOStream *io, GError **err)
+{
+    gboolean retval = FALSE;
+
+    if (err != NULL)
+	*err = NULL;
+
+    if (io->fd >= 0) {
+	if (close (io->fd)) {
+	    IO_ERRNO_ERR (err, errno, "Failed to close stream");
+	    retval = TRUE;
+	}
+    }
+
+    io_free (io);
+    return retval;
+}
+
+
+int
+io_get_fd (IOStream *io)
+{
+    return io->fd;
+}
+
 
 static gssize
 _io_fd_read (int fd, gpointer buf, gsize nbytes, GError **err)
@@ -193,25 +271,29 @@ _io_fd_read (int fd, gpointer buf, gsize nbytes, GError **err)
 }
 
 static gboolean
-_io_read (InputStream *io, GError **err)
+_io_read (IOStream *io, GError **err)
 {
-    gssize nread = _io_fd_read (io->fd, io->rbuf, io->bufsz, err);
+    gssize nread;
+
+    g_assert (io->mode == IO_MODE_READ);
+
+    nread = _io_fd_read (io->fd, io->s.read.buf, io->bufsz, err);
 
     if (nread < 0)
 	return TRUE;
 
     if (nread != io->bufsz) {
 	/* EOF, since we couldn't get as much data as we wanted */
-	io->reof = TRUE;
-	io->rend = nread;
+	io->s.read.eof = TRUE;
+	io->s.read.endpos = nread;
     }
 
-    io->rpos = 0;
+    io->s.read.curpos = 0;
     return FALSE;
 }
 
 gssize
-io_fetch_temp (InputStream *io, gsize nbytes, gchar **dest, GError **err)
+io_read_into_temp_buf (IOStream *io, gsize nbytes, gpointer *dest, GError **err)
 {
     /* disallow this situation for now. */
     g_assert (nbytes <= io->bufsz);
@@ -219,42 +301,42 @@ io_fetch_temp (InputStream *io, gsize nbytes, gchar **dest, GError **err)
     if (dest != NULL)
 	*dest = NULL;
 
-    if (io->reof) {
+    if (io->s.read.eof) {
 	/* The request is either entirely within the read
 	 * buffer or truncated by EOF; either way, we don't
 	 * need to use the scratch buf. */
 
 	if (dest != NULL)
-	    *dest = io->rbuf + io->rpos;
+	    *dest = io->s.read.buf + io->s.read.curpos;
 
-	if (io->rpos + nbytes <= io->rend) {
+	if (io->s.read.curpos + nbytes <= io->s.read.endpos) {
 	    /* Even though we're near EOF we can still
 	     * fulfill this entire request. */
-	    io->rpos += nbytes;
+	    io->s.read.curpos += nbytes;
 	    return nbytes;
 	}
 
 	/* We can only partially fulfill the request. */
-	nbytes = io->rend - io->rpos;
-	io->rpos = io->rend;
+	nbytes = io->s.read.endpos - io->s.read.curpos;
+	io->s.read.curpos = io->s.read.endpos;
 	return nbytes;
     }
 
-    if (io->rpos == io->bufsz) {
+    if (io->s.read.curpos == io->bufsz) {
 	/* Last time we read exactly up to a block boundary.
 	 * Read in a new block and try again. */
 
 	if (_io_read (io, err))
 	    return -1;
 
-	return io_fetch_temp (io, nbytes, dest, err);
+	return io_read_into_temp_buf (io, nbytes, dest, err);
     }
 
-    if (io->rpos + nbytes <= io->bufsz) {
+    if (io->s.read.curpos + nbytes <= io->bufsz) {
 	/* Not at EOF, and the request is entirely buffered */
 	if (dest != NULL)
-	    *dest = io->rbuf + io->rpos;
-	io->rpos += nbytes;
+	    *dest = io->s.read.buf + io->s.read.curpos;
+	io->s.read.curpos += nbytes;
 	return nbytes;
     }
 
@@ -263,41 +345,42 @@ io_fetch_temp (InputStream *io, gsize nbytes, gchar **dest, GError **err)
      * be reading across the end of the current buffer. */
 
     {
-	gsize nlow = io->bufsz - io->rpos;
-	gchar *buf2;
+	gsize nlow = io->bufsz - io->s.read.curpos;
+	gpointer buf2;
 	gsize nhi;
 	GError *suberr = NULL;
 
 	/* Copy in what we've already got in the current buffer. */
 
-	memcpy (io->scratch, io->rbuf + io->rpos, nlow);
+	memcpy (io->s.read.scratch, io->s.read.buf + io->s.read.curpos, nlow);
 
 	/* Try to get the rest. May hit EOF. */
 
 	if (_io_read (io, err))
 	    return -1;
 
-	nhi = io_fetch_temp (io, nbytes - nlow, &buf2, &suberr);
+	nhi = io_read_into_temp_buf (io, nbytes - nlow, &buf2, &suberr);
 
 	if (suberr != NULL) {
 	    g_propagate_error (err, suberr);
 	    return -1;
 	}
 
-	memcpy (io->scratch + nlow, buf2, nhi);
-	*dest = io->scratch;
+	memcpy (io->s.read.scratch + nlow, buf2, nhi);
+	*dest = io->s.read.scratch;
 	return nlow + nhi;
     }
 }
 
 gssize
-io_fetch_temp_typed (InputStream *io, DSType type, gsize nvals, gpointer *dest,
-		     GError **err)
+io_read_into_temp_buf_typed (IOStream *io, DSType type, gsize nvals, gpointer *dest,
+			     GError **err)
 {
     gssize retval;
 
-    retval = io_fetch_temp (io, nvals * ds_type_sizes[type],
-			    (gchar **) dest, err);
+    g_assert (dest != NULL);
+
+    retval = io_read_into_temp_buf (io, nvals * ds_type_sizes[type], dest, err);
 
     if (retval < 0)
 	return retval;
@@ -307,8 +390,8 @@ io_fetch_temp_typed (InputStream *io, DSType type, gsize nvals, gpointer *dest,
 }
 
 gssize
-io_fetch_prealloc (InputStream *io, DSType type, gsize nvals, gpointer buf,
-		   GError **err)
+io_read_into_user_buf (IOStream *io, DSType type, gsize nvals, gpointer buf,
+		       GError **err)
 {
     gsize nbytes, ninbuf;
 
@@ -320,8 +403,8 @@ io_fetch_prealloc (InputStream *io, DSType type, gsize nvals, gpointer buf,
      * data into the caller's buffer. If there isn't as much data left
      * as the user requested, return a short read. */
 
-    if (io->reof) {
-	nbytes = MIN (io->rend - io->rpos, nbytes);
+    if (io->s.read.eof) {
+	nbytes = MIN (io->s.read.endpos - io->s.read.curpos, nbytes);
 
 	if (nbytes % ds_type_sizes[type] != 0)
 	    /* Nonintegral number of items -- treat as truncated file
@@ -329,8 +412,8 @@ io_fetch_prealloc (InputStream *io, DSType type, gsize nvals, gpointer buf,
 	    return -1;
 
 	nvals = nbytes / ds_type_sizes[type];
-	io_recode_data_copy (io->rbuf + io->rpos, buf, type, nvals);
-	io->rpos += nbytes;
+	io_recode_data_copy (io->s.read.buf + io->s.read.curpos, buf, type, nvals);
+	io->s.read.curpos += nbytes;
 	return nvals;
     }
 
@@ -338,9 +421,9 @@ io_fetch_prealloc (InputStream *io, DSType type, gsize nvals, gpointer buf,
      * buffered. If there's no more to be done, we'll leave the buffer
      * in the correct state to be refilled for the next operation. */
 
-    ninbuf = MIN (nbytes, io->bufsz - io->rpos);
-    memcpy (buf, io->rbuf + io->rpos, ninbuf);
-    io->rpos += ninbuf;
+    ninbuf = MIN (nbytes, io->bufsz - io->s.read.curpos);
+    memcpy (buf, io->s.read.buf + io->s.read.curpos, ninbuf);
+    io->s.read.curpos += ninbuf;
 
     /* If we need to read more, do so, reading directly into the
      * caller's buffer.
@@ -361,20 +444,20 @@ io_fetch_prealloc (InputStream *io, DSType type, gsize nvals, gpointer buf,
 
 	if (nread < ntoread) {
 	    /* EOF, short read */
-	    io->rpos = 0;
-	    io->rend = 0;
-	    io->reof = TRUE;
+	    io->s.read.curpos = 0;
+	    io->s.read.endpos = 0;
+	    io->s.read.eof = TRUE;
 	} else {
 	    /* Not EOF -- we need to partially refill the IO stream buffer
 	     * to preserve its alignment properties.*/
-	    io->rpos = ntoread % io->bufsz;
-	    nread = _io_fd_read (io->fd, io->rbuf + io->rpos,
-				 io->bufsz - io->rpos, err);
+	    io->s.read.curpos = ntoread % io->bufsz;
+	    nread = _io_fd_read (io->fd, io->s.read.buf + io->s.read.curpos,
+				 io->bufsz - io->s.read.curpos, err);
 
-	    if (nread != (io->bufsz - io->rpos)) {
+	    if (nread != (io->bufsz - io->s.read.curpos)) {
 		/* OK, now we hit EOF. */
-		io->rend = io->rpos + nread;
-		io->reof = TRUE;
+		io->s.read.endpos = io->s.read.curpos + nread;
+		io->s.read.eof = TRUE;
 	    }
 	}
     }
@@ -393,41 +476,41 @@ io_fetch_prealloc (InputStream *io, DSType type, gsize nvals, gpointer buf,
 
 
 gboolean
-io_nudge_align (InputStream *io, gsize align_size, GError **err)
+io_nudge_align (IOStream *io, gsize align_size, GError **err)
 {
-    gsize n = io->rpos % align_size;
+    gsize n = io->s.read.curpos % align_size;
 
     if (n == 0)
 	return FALSE;
 
     n = align_size - n;
 
-    if (io->reof) {
-	if (io->rpos + n <= io->rend) {
+    if (io->s.read.eof) {
+	if (io->s.read.curpos + n <= io->s.read.endpos) {
 	    /* We're near EOF but this alignment keeps
 	     * us within the buffer, so no sweat. */
-	    io->rpos += n;
+	    io->s.read.curpos += n;
 	    return FALSE;
 	}
 
 	/* Land us on EOF */
-	io->rpos = io->rend;
+	io->s.read.curpos = io->s.read.endpos;
 	return FALSE;
     }
 
     /* This "can't happen" because bufsz should be 
      * a multiple of any alignment size since it's
      * a big power of 2. */
-    g_assert (io->rpos != io->bufsz);
+    g_assert (io->s.read.curpos != io->bufsz);
 
     /* This also "can't happen" since the exact end
      * of the buffer should be a multiple of any
      * alignment size, as above. */
-    g_assert (io->rpos + n <= io->bufsz);
+    g_assert (io->s.read.curpos + n <= io->bufsz);
 
     /* Given those, we can do this alignment entirely within the
      * buffer. */
 
-    io->rpos += n;
+    io->s.read.curpos += n;
     return FALSE;
 }
