@@ -58,6 +58,8 @@ typedef enum _DSError {
     DS_ERROR_NONEXISTANT = 4,
 } DSError;
 
+extern const gchar *ds_error_describe (DSError error);
+
 
 /* Dataset access */
 

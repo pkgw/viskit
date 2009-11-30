@@ -68,6 +68,27 @@ ds_error_quark (void)
     return g_quark_from_static_string ("ds-error-quark");
 }
 
+
+const gchar *
+ds_error_describe (DSError error)
+{
+    switch (error) {
+    case DS_ERROR_NO_ERROR:
+	return "no error";
+    case DS_ERROR_FORMAT:
+	return "invalid data format";
+    case DS_ERROR_INTERNAL_PERMS:
+	return "operation not permitted in this mode";
+    case DS_ERROR_ITEM_NAME:
+	return "illegal item name";
+    case DS_ERROR_NONEXISTANT:
+	return "does not exist";
+    default:
+	return "unknown error";
+    }
+}
+
+
 void
 _ds_set_name_dir (Dataset *ds)
 {

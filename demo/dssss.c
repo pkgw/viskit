@@ -8,6 +8,7 @@ main (int argc, char **argv)
 {
     Dataset *ds;
     GError *err = NULL;
+    DSError dserr;
 
     if (argc != 4) {
 	fprintf (stderr, "Usage: %s <dsname> <itemname> <itemvalue>\n", argv[0]);
@@ -19,8 +20,10 @@ main (int argc, char **argv)
 	return 1;
     }
 
-    if (ds_set_small_item_string (ds, argv[2], argv[3], TRUE)) {
-	fprintf (stderr, "Error setting item \"%s\"\n", argv[2]);
+    dserr = ds_set_small_item_string (ds, argv[2], argv[3], TRUE);
+    if (dserr != DS_ERROR_NO_ERROR) {
+	fprintf (stderr, "Error setting item \"%s\": %s\n", argv[2],
+		 ds_error_describe (dserr));
 	return 1;
     }
 
