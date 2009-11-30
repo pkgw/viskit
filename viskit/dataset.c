@@ -86,8 +86,22 @@ ds_open (const char *filename, IOMode mode, IOOpenFlags flags, GError **err)
     g_return_val_if_fail (filename != NULL, NULL);
     g_return_val_if_fail (mode == IO_MODE_READ, NULL);
 
+    if (mode & IO_MODE_READ) {
+	/* This isn't a fully comprehensive test, and as always it is
+	 * subject to races. We'll have a better idea of whether this
+	 * DS is ok when we try to read in the header. */
+
+	if (!g_file_test (filename, G_FILE_TEST_IS_DIR)) {
+	    g_set_error (err, G_FILE_ERROR, G_FILE_ERROR_NOTDIR,
+			 "Cannot open the dataset \"%s\" since it "
+			 "does not exist or is not a directory.", filename);
+	    return NULL;
+	}
+    }
+
+
 #if 0
-    if (mode == IO_MODE_CREATE) {
+    {
 	if (g_file_test (filename, G_FILE_TEST_EXISTS)) {
 	    g_set_error (err, G_FILE_ERROR, G_FILE_ERROR_EXIST,
 			 "Cannot create the dataset \"%s\" since a "
@@ -98,17 +112,6 @@ ds_open (const char *filename, IOMode mode, IOOpenFlags flags, GError **err)
 	if (mkdir (filename, 0755)) {
 	    IO_ERRNO_ERRV (err, errno, "Failed to create dataset "
 			  "directory \"%s\"", filename);
-	    return NULL;
-	}
-    } else {
-	/* This isn't a fully comprehensive test, and as always it is
-	 * subject to races. We'll have a better idea of whether this
-	 * DS is ok when we try to read in the header. */
-
-	if (!g_file_test (filename, G_FILE_TEST_IS_DIR)) {
-	    g_set_error (err, G_FILE_ERROR, G_FILE_ERROR_NOTDIR,
-			 "Cannot open the dataset \"%s\" since it "
-			 "does not exist or is not a directory.", filename);
 	    return NULL;
 	}
     }
@@ -541,7 +544,7 @@ ds_set_small_item (Dataset *ds, const gchar *name, DSType type, gsize nvals,
 {
     DSSmallItem *small;
 
-    if (ds->mode == IO_MODE_READ)
+    if (!(ds->mode & IO_MODE_WRITE))
 	return TRUE;
 
     if (nvals * ds_type_sizes[type] > 64)
@@ -558,12 +561,7 @@ ds_set_small_item (Dataset *ds, const gchar *name, DSType type, gsize nvals,
 
 	small = g_new0 (DSSmallItem, 1);
 	strcpy (small->name, name);
-#if 0
-    } else if (ds->mode == IO_MODE_APPEND) {
-	/* If in append mode, can create new small items but not
-	 * modify existing ones. */
-	return TRUE;
-#endif
+	g_hash_table_insert (ds->small_items, small->name, small);
     }
 
     small->type = type;
