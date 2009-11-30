@@ -132,7 +132,7 @@ ds_type_format (gpointer data, DSType type, gssize nvals)
 	return g_strdup ("<>");
 
     if (type == DST_TEXT)
-	return g_strdup_printf ("\"%.*s\"", nvals, (gchar *) data);
+	return g_strdup_printf ("\"%.*s\"", (int) nvals, (gchar *) data);
 
     s = g_string_new ("");
 

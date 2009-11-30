@@ -46,7 +46,7 @@ main (int argc, char **argv)
 	else
 	    printf ("small");
 
-	printf (" %-12s %10d vals", ds_type_names[dii->type], dii->nvals);
+	printf (" %-12s %10zd vals", ds_type_names[dii->type], dii->nvals);
 
 	if (dii->nvals == 1) {
 	    switch (dii->type) {
