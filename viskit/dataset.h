@@ -1,6 +1,7 @@
 #ifndef _VISKIT_DATASET_H
 #define _VISKIT_DATASET_H
 
+#include <string.h> /* strlen */
 #include <glib.h>
 #include <viskit/iostream.h>
 
@@ -42,5 +43,21 @@ extern void ds_item_info_free (DSItemInfo *dii);
 extern gboolean ds_get_item_i64 (Dataset *ds, const gchar *name, gint64 *val);
 extern gboolean ds_get_item_f64 (Dataset *ds, const gchar *name, gdouble *val);
 extern gchar *ds_get_item_small_string (Dataset *ds, const gchar *name);
+
+extern gboolean ds_set_small_item (Dataset *ds, const gchar *name, DSType type,
+				   gsize nvals, gpointer data, gboolean create_ok);
+
+#define ds_set_small_item_i16(ds, name, value, create_ok) \
+    ds_set_small_item ((ds), (name), DST_I16, 1, &((gint16) (value)), (create_ok))
+#define ds_set_small_item_i32(ds, name, value, create_ok) \
+    ds_set_small_item ((ds), (name), DST_I32, 1, &((gint32) (value)), (create_ok))
+#define ds_set_small_item_i64(ds, name, value, create_ok) \
+    ds_set_small_item ((ds), (name), DST_I64, 1, &((gint64) (value)), (create_ok))
+#define ds_set_small_item_f32(ds, name, value, create_ok) \
+    ds_set_small_item ((ds), (name), DST_F32, 1, &((gfloat) (value)), (create_ok))
+#define ds_set_small_item_f64(ds, name, value, create_ok) \
+    ds_set_small_item ((ds), (name), DST_F64, 1, &((gdouble) (value)), (create_ok))
+#define ds_set_small_item_string(ds, name, value, create_ok) \
+    ds_set_small_item ((ds), (name), DST_I8, strlen (value), (value), (create_ok))
 
 #endif

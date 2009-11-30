@@ -10,7 +10,7 @@
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
-#include <ctype.h> /*isprint*/
+#include <ctype.h> /*isprint etc*/
 
 /* Note that these limits are set by the file format and MUST NOT be
  * changed by the user. Doing so will break compatibility with the
@@ -504,4 +504,70 @@ ds_get_item_small_string (Dataset *ds, const gchar *name)
 	return NULL;
 
     return g_strndup (small->vals.text, small->nvals);
+}
+
+gboolean
+_ds_item_name_ok (const gchar *name)
+{
+    size_t l;
+    int i;
+
+    g_return_val_if_fail (name != NULL, FALSE);
+
+    l = strlen (name);
+
+    if (l < 1 || l > 8)
+	return FALSE;
+
+    if (l == 6 && strcmp (name, "header") == 0)
+	return FALSE;
+
+    if (!islower (name[0]))
+	return FALSE;
+
+    for (i = 1; i < l; i++) {
+	int c = (int) name[i];
+
+	if (!(islower (c) || isdigit (c) || c == '-' || c == '_'))
+	    return FALSE;
+    }
+
+    return TRUE;
+}
+
+gboolean
+ds_set_small_item (Dataset *ds, const gchar *name, DSType type, gsize nvals,
+		   gpointer data, gboolean create_ok)
+{
+    DSSmallItem *small;
+
+    if (ds->mode == IO_MODE_READ)
+	return TRUE;
+
+    if (nvals * ds_type_sizes[type] > 64)
+	return TRUE;
+
+    small = (DSSmallItem *) g_hash_table_lookup (ds->small_items, name);
+
+    if (small == NULL) {
+	if (!create_ok)
+	    return TRUE;
+
+	if (!_ds_item_name_ok (name))
+	    return TRUE;
+
+	small = g_new0 (DSSmallItem, 1);
+	strcpy (small->name, name);
+#if 0
+    } else if (ds->mode == IO_MODE_APPEND) {
+	/* If in append mode, can create new small items but not
+	 * modify existing ones. */
+	return TRUE;
+#endif
+    }
+
+    small->type = type;
+    small->nvals = nvals;
+    memcpy (DSI_DATA (small), data, nvals * ds_type_sizes[type]);
+    return FALSE;
 }
