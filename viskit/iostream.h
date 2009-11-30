@@ -54,6 +54,12 @@ extern gssize io_read_into_temp_buf_typed (IOStream *io, DSType type, gsize nval
 					   gpointer *dest, GError **err);
 extern gssize io_read_into_user_buf (IOStream *io, DSType type, gsize nvals,
 				     gpointer buf, GError **err);
+
+extern gboolean io_write_raw (IOStream *io, gsize nbytes, const gpointer buf,
+			      GError **err);
+extern gboolean io_write_typed (IOStream *io, DSType type, gsize nvals,
+				const gpointer buf, GError **err);
+
 extern gboolean io_nudge_align (IOStream *io, gsize align_size, GError **err);
 
 #endif

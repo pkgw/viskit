@@ -139,6 +139,10 @@ struct _IOStream {
 	    gsize endpos; /* location of EOF within the buffer */
 	    gboolean eof; /* have we read to EOF? */
 	} read;
+	struct {
+	    gchar *buf;
+	    gsize curpos; /* position of read cursor within buffer. */
+	} write;
     } s; /* short for "state" */
 };
 
@@ -182,8 +186,8 @@ io_new_from_fd (IOMode mode, int fd, gsize bufsz, goffset align_hint)
 	io->s.read.endpos = 0;
 	break;
     case IO_MODE_WRITE:
-	/* handle write stream */
-	g_assert (0);
+	io->s.write.buf = g_new (gchar, bufsz);
+	io->s.write.curpos = 0;
 	break;
     default:
 	/* Unsupported stream mode: we only do read or write but not both. */
@@ -205,8 +209,8 @@ io_free (IOStream *io)
 	io->s.read.scratch = NULL;
 	break;
     case IO_MODE_WRITE:
-	/* handle write stream */
-	g_assert (0);
+	g_free (io->s.write.buf);
+	io->s.write.buf = NULL;
 	break;
     default:
 	g_assert_not_reached ();
@@ -270,6 +274,32 @@ _io_fd_read (int fd, gpointer buf, gsize nbytes, GError **err)
     return nbytes - nleft;
 }
 
+
+static gboolean
+_io_fd_write (int fd, const gpointer buf, gsize nbytes, GError **err)
+{
+    gpointer bufiter = buf;
+    gsize nleft = nbytes;
+    gssize nwritten;
+
+    while (nleft > 0) {
+	nwritten = write (fd, bufiter, nleft);
+
+	if (nwritten < 0) {
+	    if (errno == EINTR)
+		continue;
+	    IO_ERRNO_ERR (err, errno, "Failed to read stream");
+	    return TRUE;
+	}
+
+	bufiter += nwritten;
+	nleft -= nwritten;
+    }
+
+    return FALSE;
+}
+
+
 static gboolean
 _io_read (IOStream *io, GError **err)
 {
@@ -291,6 +321,20 @@ _io_read (IOStream *io, GError **err)
     io->s.read.curpos = 0;
     return FALSE;
 }
+
+
+static gboolean
+_io_write (IOStream *io, GError **err)
+{
+    g_assert (io->mode == IO_MODE_WRITE);
+
+    if (_io_fd_write (io->fd, io->s.write.buf, io->bufsz, err) < 0)
+	return TRUE;
+
+    io->s.write.curpos = 0;
+    return FALSE;
+}
+
 
 gssize
 io_read_into_temp_buf (IOStream *io, gsize nbytes, gpointer *dest, GError **err)
@@ -481,41 +525,134 @@ io_read_into_user_buf (IOStream *io, DSType type, gsize nvals, gpointer buf,
 gboolean
 io_nudge_align (IOStream *io, gsize align_size, GError **err)
 {
-    gsize n = io->s.read.curpos % align_size;
+    gsize n;
 
-    g_assert (io->mode == IO_MODE_READ);
+    if (io->mode == IO_MODE_READ) {
+	if ((n = io->s.read.curpos % align_size) == 0)
+	    return FALSE;
 
-    if (n == 0)
-	return FALSE;
+	n = align_size - n;
 
-    n = align_size - n;
+	if (io->s.read.eof) {
+	    if (io->s.read.curpos + n <= io->s.read.endpos) {
+		/* We're near EOF but this alignment keeps
+		 * us within the buffer, so no sweat. */
+		io->s.read.curpos += n;
+		return FALSE;
+	    }
 
-    if (io->s.read.eof) {
-	if (io->s.read.curpos + n <= io->s.read.endpos) {
-	    /* We're near EOF but this alignment keeps
-	     * us within the buffer, so no sweat. */
-	    io->s.read.curpos += n;
+	    /* Land us on EOF */
+	    io->s.read.curpos = io->s.read.endpos;
 	    return FALSE;
 	}
 
-	/* Land us on EOF */
-	io->s.read.curpos = io->s.read.endpos;
-	return FALSE;
+	/* This "can't happen" because bufsz should be
+	 * a multiple of any alignment size since it's
+	 * a big power of 2. */
+	g_assert (io->s.read.curpos != io->bufsz);
+
+	/* This also "can't happen" since the exact end
+	 * of the buffer should be a multiple of any
+	 * alignment size, as above. */
+	g_assert (io->s.read.curpos + n <= io->bufsz);
+
+	/* Given those, we can do this alignment entirely within the
+	 * buffer. */
+
+	io->s.read.curpos += n;
+    } else if (io->mode == IO_MODE_WRITE) {
+	if ((n = io->s.write.curpos % align_size) == 0)
+	    return FALSE;
+
+	n = align_size - n;
+
+	/* As above. */
+	g_assert (io->s.write.curpos != io->bufsz);
+	g_assert (io->s.write.curpos + n <= io->bufsz);
+
+	memset (io->s.write.buf + io->s.write.curpos, 0, n);
+	io->s.write.curpos += n;
     }
 
-    /* This "can't happen" because bufsz should be 
-     * a multiple of any alignment size since it's
-     * a big power of 2. */
-    g_assert (io->s.read.curpos != io->bufsz);
+    return FALSE;
+}
 
-    /* This also "can't happen" since the exact end
-     * of the buffer should be a multiple of any
-     * alignment size, as above. */
-    g_assert (io->s.read.curpos + n <= io->bufsz);
 
-    /* Given those, we can do this alignment entirely within the
-     * buffer. */
+gboolean
+io_write_raw (IOStream *io, gsize nbytes, const gpointer buf, GError **err)
+{
+    gpointer bufiter = buf;
 
-    io->s.read.curpos += n;
+    g_assert (io->mode == IO_MODE_WRITE);
+
+    while (nbytes > 0) {
+	gsize ntowrite;
+
+	ntowrite = MIN (nbytes, io->bufsz - io->s.write.curpos);
+
+	if (io->s.write.curpos == 0 && ntowrite == io->bufsz) {
+	    /* We'd write an entire buffer of data. We can short-circuit
+	     * the copying of the data to the write buffer. */
+	    if (_io_fd_write (io->fd, bufiter, ntowrite, err))
+		return TRUE;
+	} else {
+	    memcpy (io->s.write.buf + io->s.write.curpos, bufiter, ntowrite);
+	    io->s.write.curpos += ntowrite;
+	}
+
+	if (io->s.write.curpos == io->bufsz) {
+	    /* We've filled up the buffer. Write it out. */
+	    if (_io_write (io, err))
+		return TRUE;
+	}
+
+	bufiter += ntowrite;
+	nbytes -= ntowrite;
+    }
+
+    return FALSE;
+}
+
+
+gboolean
+io_write_typed (IOStream *io, DSType type, gsize nvals, const gpointer buf,
+		GError **err)
+{
+    gpointer bufiter = buf;
+    guint8 tsize = ds_type_sizes[type];
+    gsize nbytes = nvals * tsize;
+
+    g_assert (io->mode == IO_MODE_WRITE);
+
+    while (nbytes > 0) {
+	gsize nbytestowrite, nvalstowrite;
+
+	nbytestowrite = MIN (nbytes, io->bufsz - io->s.write.curpos);
+
+	if (nbytestowrite % tsize != 0) {
+	    g_assert (0);
+	    /*g_set_error (err, foo, foo, "Alignment error in typed data write");*/
+	    return TRUE;
+	}
+
+	nvalstowrite = nbytestowrite / tsize;
+
+	/* Unlike the untyped write, we can't save a copy in the whole-
+	 * buffer case since we need to byteswap the data anyway. */
+
+	io_recode_data_copy (bufiter, io->s.write.buf + io->s.write.curpos,
+			     type, nvalstowrite);
+	io->s.write.curpos += nbytestowrite;
+
+	if (io->s.write.curpos == io->bufsz) {
+	    /* We've filled up the buffer. Write it out. */
+	    if (_io_write (io, err))
+		return TRUE;
+	}
+
+	bufiter += nbytestowrite;
+	nbytes -= nbytestowrite;
+    }
+
     return FALSE;
 }
