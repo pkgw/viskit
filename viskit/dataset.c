@@ -52,6 +52,10 @@ typedef struct _DSSmallItem {
 
 #define DSI_DATA(small) ((gpointer) small->vals.i8)
 
+static IOStream *_ds_open_large_item_full (Dataset *ds, const gchar *name,
+					   IOMode mode, DSOpenFlags flags,
+					   gboolean trunc_ok, GError **err);
+
 GQuark
 ds_error_quark (void)
 {
@@ -308,8 +312,9 @@ ds_write_header (Dataset *ds, GError **err)
 
     g_assert (ds->mode & IO_MODE_WRITE);
 
-    hio = ds_open_large_item (ds, "header", IO_MODE_WRITE,
-			      DS_OFLAGS_TRUNCATE | DS_OFLAGS_CREATE_OK, err);
+    hio = _ds_open_large_item_full (ds, "header", IO_MODE_WRITE,
+				    DS_OFLAGS_TRUNCATE | DS_OFLAGS_CREATE_OK,
+				    TRUE, err);
     if (hio == NULL)
 	return TRUE;
 
@@ -447,9 +452,9 @@ ds_list_items (Dataset *ds, GError **err)
     return items;
 }
 
-IOStream *
-ds_open_large_item (Dataset *ds, const gchar *name, IOMode mode,
-		    DSOpenFlags flags, GError **err)
+static IOStream *
+_ds_open_large_item_full (Dataset *ds, const gchar *name, IOMode mode,
+			  DSOpenFlags flags, gboolean trunc_ok, GError **err)
 {
     /* Note: this function is called in ds_open to read the header, so
      * keep in mind that ds may not be fully initialized. */
@@ -467,9 +472,11 @@ ds_open_large_item (Dataset *ds, const gchar *name, IOMode mode,
 	    oflags |= O_CREAT;
 	if (flags & DS_OFLAGS_EXIST_BAD)
 	    oflags |= O_CREAT | O_EXCL;
-	if (flags & DS_OFLAGS_TRUNCATE)
+	if (flags & DS_OFLAGS_TRUNCATE) {
+	    if (ds->oflags & DS_OFLAGS_APPEND && !trunc_ok)
+		return NULL;
 	    oflags |= O_TRUNC;
-	else if (flags & DS_OFLAGS_APPEND)
+	} else if (flags & DS_OFLAGS_APPEND)
 	    oflags |= O_APPEND;
 	else
 	    g_assert_not_reached ();
@@ -493,6 +500,13 @@ ds_open_large_item (Dataset *ds, const gchar *name, IOMode mode,
      * buffer :-( */
 
     return io_new_from_fd (mode, fd, 0, 0);
+}
+
+IOStream *
+ds_open_large_item (Dataset *ds, const gchar *name, IOMode mode,
+		    DSOpenFlags flags, GError **err)
+{
+    return _ds_open_large_item_full (ds, name, mode, flags, FALSE, err);
 }
 
 static gboolean
