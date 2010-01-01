@@ -14,5 +14,5 @@ libviskit_la_SOURCES = \
  maskitem.h \
  types.c \
  types.h \
- uvreader.c \
- uvreader.h
+ uvio.c \
+ uvio.h

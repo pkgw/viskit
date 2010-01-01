@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <glib.h>
-#include <viskit/uvreader.h>
+#include <viskit/uvio.h>
 
 /*#define SILENT*/
 
@@ -8,7 +8,7 @@ int
 main (int argc, char **argv)
 {
     Dataset *ds;
-    UVReader *uvr;
+    UVIO *uvio;
     UVEntryType uvet;
     UVVariable *var;
     gpointer uvdata;
@@ -29,15 +29,15 @@ main (int argc, char **argv)
 	return 1;
     }
 
-    uvr = uvr_alloc ();
-    if (uvr_prep (uvr, ds, &err)) {
+    uvio = uvio_alloc ();
+    if (uvio_open (uvio, ds, IO_MODE_READ, 0, &err)) {
 	fprintf (stderr, "Error opening UV stream of dataset \"%s\": %s\n",
 		 argv[1], err->message);
 	return 1;
     }
 
     while (TRUE) {
-	uvet = uvr_next (uvr, &uvdata, &err);
+	uvet = uvio_read_next (uvio, &uvdata, &err);
 
 	switch (uvet) {
 	case UVET_ERROR:
@@ -75,7 +75,19 @@ main (int argc, char **argv)
 	    break;
     }
 
-    uvr_free (uvr);
-    ds_close (ds, NULL);
+    if (uvio_close (uvio, &err)) {
+	fprintf (stderr, "Error closing UV stream of dataset \"%s\": %s\n",
+		 argv[1], err->message);
+	return 1;
+    }
+
+    uvio_free (uvio);
+
+    if (ds_close (ds, &err)) {
+	fprintf (stderr, "Error closing dataset \"%s\": %s\n",
+		 argv[1], err->message);
+	return 1;
+    }
+
     return 0;
 }
