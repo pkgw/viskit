@@ -16,7 +16,7 @@
 #define DEFAULT_BUFSZ 16384
 
 static gssize _io_fd_read (int fd, gpointer buf, gsize nbytes, GError **err);
-static gboolean _io_fd_write (int fd, const gpointer buf, gsize nbytes,
+static gboolean _io_fd_write (int fd, gconstpointer buf, gsize nbytes,
 			      GError **err);
 static gboolean _io_read (IOStream *io, GError **err);
 static gboolean _io_write (IOStream *io, GError **err);
@@ -37,11 +37,23 @@ typedef union _IOBufptr {
     gchar *text;
 } IOBufptr;
 
+typedef union _IOConstBufptr {
+    gconstpointer any;
+    const gint8 *i8;
+    const gint16 *i16;
+    const gint32 *i32;
+    const gint64 *i64;
+    const gfloat *f32;
+    const gdouble *f64;
+    const gchar *text;
+} IOConstBufptr;
+
 void
-io_recode_data_copy (gchar *src, gchar *dest, DSType type, gsize nvals)
+io_recode_data_copy (const gchar *src, gchar *dest, DSType type, gsize nvals)
 {
     gsize i;
-    IOBufptr bsrc, bdest;
+    IOConstBufptr bsrc;
+    IOBufptr bdest;
 
     bsrc.any = src;
     bdest.any = dest;
@@ -295,9 +307,9 @@ _io_fd_read (int fd, gpointer buf, gsize nbytes, GError **err)
 
 
 static gboolean
-_io_fd_write (int fd, const gpointer buf, gsize nbytes, GError **err)
+_io_fd_write (int fd, gconstpointer buf, gsize nbytes, GError **err)
 {
-    gpointer bufiter = buf;
+    gconstpointer bufiter = buf;
     gsize nleft = nbytes;
     gssize nwritten;
 
@@ -598,9 +610,9 @@ io_nudge_align (IOStream *io, gsize align_size, GError **err)
 
 
 gboolean
-io_write_raw (IOStream *io, gsize nbytes, const gpointer buf, GError **err)
+io_write_raw (IOStream *io, gsize nbytes, gconstpointer buf, GError **err)
 {
-    gpointer bufiter = buf;
+    gconstpointer bufiter = buf;
 
     g_assert (io->mode == IO_MODE_WRITE);
 
@@ -634,10 +646,10 @@ io_write_raw (IOStream *io, gsize nbytes, const gpointer buf, GError **err)
 
 
 gboolean
-io_write_typed (IOStream *io, DSType type, gsize nvals, const gpointer buf,
+io_write_typed (IOStream *io, DSType type, gsize nvals, gconstpointer buf,
 		GError **err)
 {
-    gpointer bufiter = buf;
+    gconstpointer bufiter = buf;
     guint8 tsize = ds_type_sizes[type];
     gsize nbytes = nvals * tsize;
 

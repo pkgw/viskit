@@ -19,7 +19,7 @@ typedef enum _IOMode {
 #define IO_RECODE_I32(buf) GINT32_FROM_BE (*((guint32 *)buf))
 #define IO_RECODE_I64(buf) GINT64_FROM_BE (*((guint64 *)buf))
 
-extern void io_recode_data_copy (gchar *src, gchar *dest, 
+extern void io_recode_data_copy (const gchar *src, gchar *dest,
 				 DSType type, gsize nvals);
 extern void io_recode_data_inplace (gchar *data, DSType type, gsize nvals);
 
@@ -46,10 +46,10 @@ extern gssize io_read_into_temp_buf_typed (IOStream *io, DSType type, gsize nval
 extern gssize io_read_into_user_buf (IOStream *io, DSType type, gsize nvals,
 				     gpointer buf, GError **err);
 
-extern gboolean io_write_raw (IOStream *io, gsize nbytes, const gpointer buf,
+extern gboolean io_write_raw (IOStream *io, gsize nbytes, gconstpointer buf,
 			      GError **err);
 extern gboolean io_write_typed (IOStream *io, DSType type, gsize nvals,
-				const gpointer buf, GError **err);
+				gconstpointer buf, GError **err);
 
 extern gboolean io_nudge_align (IOStream *io, gsize align_size, GError **err);
 
