@@ -38,6 +38,7 @@ typedef enum _DSOpenFlags {
      *   one of them must be specified.
      */
 
+    DS_OFLAGS_NONE      = 0,
     DS_OFLAGS_CREATE_OK = 1 << 0,
     DS_OFLAGS_EXIST_BAD = 1 << 1,
     DS_OFLAGS_TRUNCATE  = 1 << 2,
