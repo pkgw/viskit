@@ -504,50 +504,63 @@ io_read_into_user_buf (IOStream *io, DSType type, gsize nvals, gpointer buf,
     io->s.read.curpos += ninbuf;
 
     /* If we need to read more, do so, reading directly into the
-     * caller's buffer.
-     *
-     * FIXME: doing this causes us to lose our nice block-aligned
-     * read behavior, and tests indicate that doing so can indeed
-     * cause a massive performance hit. For now, we make the default
-     * buffer size big enough for that not to be a problem for UV
-     * variables, but if we have million-point spectra, the problem
-     * will arise in the future. We could do block-aligned reads into
-     * the user buffer, do a final read into the IO buffer again,
-     * then copy the last bit of data into the caller's buffer. */
+     * caller's buffer. Preserve alignment within our buffer at
+     * the end of things, and read only in multiples of our block
+     * size. */
 
     if (ninbuf < nbytes) {
 	gsize ntoread = nbytes - ninbuf;
-	gssize nread = _io_fd_read (io->fd, buf + ninbuf, ntoread, err);
-	nbytes = ninbuf + nread;
+	gsize nblocks = ntoread / io->bufsz; /* truncating div. */
 
-	if (nread < ntoread) {
-	    /* EOF, short read */
-	    io->s.read.curpos = 0;
-	    io->s.read.endpos = 0;
-	    io->s.read.eof = TRUE;
-	} else {
-	    /* Not EOF -- we need to partially refill the IO stream buffer
-	     * to preserve its alignment properties.*/
-	    io->s.read.curpos = ntoread % io->bufsz;
-	    nread = _io_fd_read (io->fd, io->s.read.buf + io->s.read.curpos,
-				 io->bufsz - io->s.read.curpos, err);
+	if (nblocks > 0) {
+	    /* Read all but the last block directly into the user's buffer. */
+	    gssize nread;
 
-	    if (nread != (io->bufsz - io->s.read.curpos)) {
-		/* OK, now we hit EOF. */
-		io->s.read.endpos = io->s.read.curpos + nread;
+	    ntoread = nblocks * io->bufsz;
+	    nread = _io_fd_read (io->fd, buf + ninbuf, ntoread, err);
+
+	    if (nread < 0)
+		return -1;
+
+	    if (nread < ntoread) {
+		/* EOF, short read */
+		io->s.read.curpos = 0;
+		io->s.read.endpos = 0;
 		io->s.read.eof = TRUE;
 	    }
+
+	    ntoread -= nread;
+	    ninbuf += nread;
+	}
+
+	if (ntoread > 0 && !io->s.read.eof) {
+	    /* Not EOF and we have a little bit more to read. (Specifically, we
+	     * have less than bufsz.) This batch gets read into the IO stream
+	     * buffer to preserve its alignment properties.*/
+	    gsize navail;
+
+	    if (_io_read (io, err))
+		return -1;
+
+	    if (io->s.read.eof)
+		navail = MIN (ntoread, io->s.read.endpos);
+	    else
+		navail = ntoread;
+
+	    memcpy (buf + ninbuf, io->s.read.buf, navail);
+	    ninbuf += navail;
+	    io->s.read.curpos = navail;
 	}
     }
 
     /* We may have a short read -- integral number of items read? */
 
-    if (nbytes % ds_type_sizes[type] != 0)
+    if (ninbuf % ds_type_sizes[type] != 0)
 	return -1;
 
     /* Yay, finished successfully. */
 
-    nvals = nbytes / ds_type_sizes[type];
+    nvals = ninbuf / ds_type_sizes[type];
     io_recode_data_inplace (buf, type, nvals);
     return nvals;
 }
