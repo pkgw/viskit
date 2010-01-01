@@ -308,7 +308,7 @@ ds_open (const char *filename, IOMode mode, DSOpenFlags flags, GError **err)
     strcpy (ds->namebuf, filename);
     ds->mode = mode;
     ds->oflags = flags;
-    ds->header_dirty = FALSE;
+    ds->header_dirty = created; /* Write blank header if creating dset */
     ds->small_items = g_hash_table_new_full (g_str_hash,
 					     g_str_equal,
 					     NULL, g_free);
