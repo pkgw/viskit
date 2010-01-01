@@ -376,10 +376,7 @@ ds_write_header (Dataset *ds, GError **err)
 
     /* Write out new header alongside old one */
 
-    hio = _ds_open_large_item_full (ds, "header+new", IO_MODE_WRITE,
-				    DS_OFLAGS_TRUNCATE | DS_OFLAGS_CREATE_OK,
-				    TRUE, FALSE, err);
-    if (hio == NULL)
+    if ((hio = ds_open_large_item_for_replace (ds, "header", err)) == NULL)
 	return TRUE;
 
     g_hash_table_iter_init (&hiter, ds->small_items);
@@ -428,7 +425,8 @@ ds_write_header (Dataset *ds, GError **err)
     if (io_close_and_free (hio, err))
 	return TRUE;
 
-    /* Move it into place */
+    /* Move it into place. Avoid ds_finish_large_item_replace since it will
+     * reject the destination name "header". */
 
     if (_ds_rename_large_item_full (ds, "header+new", "header", FALSE, err))
 	return TRUE;
@@ -589,6 +587,33 @@ ds_open_large_item (Dataset *ds, const gchar *name, IOMode mode,
 {
     return _ds_open_large_item_full (ds, name, mode, flags, FALSE, TRUE, err);
 }
+
+IOStream *
+ds_open_large_item_for_replace (Dataset *ds, const gchar *name, GError **err)
+{
+    gchar *repname;
+    IOStream *retval;
+
+    repname = g_strconcat (name, "+new", NULL);
+    retval = _ds_open_large_item_full (ds, repname, IO_MODE_WRITE,
+				       DS_OFLAGS_TRUNCATE | DS_OFLAGS_CREATE_OK,
+				       TRUE, FALSE, err);
+    g_free (repname);
+    return retval;
+}
+
+gboolean
+ds_finish_large_item_replace (Dataset *ds, const gchar *name, GError **err)
+{
+    gchar *repname;
+    gboolean retval;
+
+    repname = g_strconcat (name, "+new", NULL);
+    retval = _ds_rename_large_item_full (ds, repname, name, TRUE, err);
+    g_free (repname);
+    return retval;
+}
+
 
 static gboolean
 _ds_probe_large_item (Dataset *ds, const gchar *name, DSType *type,

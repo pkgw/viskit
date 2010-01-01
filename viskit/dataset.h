@@ -84,6 +84,11 @@ extern IOStream *ds_open_large_item (Dataset *ds, const gchar *name, IOMode mode
 extern DSItemInfo *ds_probe_item (Dataset *ds, const gchar *name, GError **err);
 extern void ds_item_info_free (DSItemInfo *dii);
 
+extern IOStream *ds_open_large_item_for_replace (Dataset *ds, const gchar *name,
+						 GError **err);
+extern gboolean ds_finish_large_item_replace (Dataset *ds, const gchar *name,
+					      GError **err);
+
 extern gboolean ds_get_item_i64 (Dataset *ds, const gchar *name, gint64 *val);
 extern gboolean ds_get_item_f64 (Dataset *ds, const gchar *name, gdouble *val);
 extern gchar *ds_get_item_small_string (Dataset *ds, const gchar *name);
