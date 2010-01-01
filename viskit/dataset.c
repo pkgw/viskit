@@ -361,11 +361,6 @@ gboolean
 ds_rename_large_item (Dataset *ds, const gchar *oldname, const gchar *newname,
 		      GError **err)
 {
-    g_assert (ds->mode & IO_MODE_WRITE);
-
-    if (!_ds_item_name_ok (newname, err))
-	return TRUE;
-
     return _ds_rename_large_item_full (ds, oldname, newname, TRUE, err);
 }
 
