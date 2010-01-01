@@ -458,7 +458,7 @@ ds_close (Dataset *ds, GError **err)
     }
 
     if (ds->small_items) {
-	g_free (ds->small_items);
+	g_hash_table_destroy (ds->small_items);
 	ds->small_items = NULL;
     }
 
