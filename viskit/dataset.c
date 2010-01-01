@@ -262,7 +262,7 @@ ds_open (const char *filename, IOMode mode, DSOpenFlags flags, GError **err)
     gboolean created = FALSE;
 
     g_return_val_if_fail (filename != NULL, NULL);
-    g_return_val_if_fail (mode & IO_MODE_READ, NULL);
+    g_return_val_if_fail (mode != IO_MODE_READ_WRITE, NULL);
 
     if ((mode & IO_MODE_WRITE) && (flags & DS_OFLAGS_EXIST_BAD)) {
 	flags |= DS_OFLAGS_CREATE_OK;
