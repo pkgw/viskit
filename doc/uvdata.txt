@@ -15,20 +15,22 @@ variable type that constitute a "value" for the variable), and a
 value. As the UV data are streamed, the values and *sizes* of various
 variables can be updated. The type of a variable may not be updated.
 In theory, variable values can be changed arbitrarily, but the
-semantics of the UV variables strongly limit the avaiable choices.
+semantics of the UV variables strongly limit the available choices.
 
 The stream of UV variable values is grouped into "records". When the
 end of a record is reached, the set of values for all of the defined
 variables defines a UV visibility record. Some variables vary for
-every record; some never or rarely change.
+every record; some never or rarely change. Variable values that
+change from one record to the next are conceived of as all changing
+simultaneously with the record.
 
-UV variables are are somewhat similar to DS items (in that they have
-names, types, sizes, and values), but should not be confused with
-them. DS items can, however, be used to override the values of UV
+UV variables are are somewhat similar to dataset items (in that they
+have names, types, sizes, and values), but should not be confused with
+them. Dataset items can, however, be used to override the values of UV
 variables.
 
-As with DS items, UV variable names must be 8 characters or fewer in
-length. They must consist of lower-case letters or digits and start
+As with dataset items, UV variable names must be 8 characters or fewer
+in length. They must consist of lower-case letters or digits and start
 with a letter. A dataset may define no more than 256 UV variables.
 
 *** Standard items
@@ -38,7 +40,8 @@ A visibility DS MUST include the following items:
 * obstype (short a[*])
   One of the strings "autocorrelation", "crosscorrelation", or
   "mixed-auto-cross". Specifies which sorts of visibilities are
-  present in the visibility data.
+  present in the visibility data. MIRIAD seems to generally accept
+  any strings beginning with "auto", "cross", or "mixed".
 
 * vislen (l) [i in MIR3]
   The size of the "visdata" DS item in bytes, plus four???
@@ -113,6 +116,8 @@ As mentioned above, a UV DS MAY include further items with the name
 of any UV variable. Such items must have the type and dimension 
 appropriate for such a variable. Such items override the values of
 any instances of their respective UV variables in the UV stream.
+MIRIAD only supports such overrides if the overridden variable
+value has length 1.
 
 UV Data Stream Semantics
 ------------------------
@@ -245,7 +250,7 @@ usual abbreviations.
 Each variable is assigned an integer identifier based on its order
 in the file. The variable specified in the first line has an
 identifier of 0, the next of 1, and so on. No more than 256 variables
-may be defined.
+(ie, identifier of 255) may be defined.
 
 *** visdata
 
