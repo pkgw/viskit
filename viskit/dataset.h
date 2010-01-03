@@ -77,8 +77,7 @@ extern Dataset *ds_open (const char *filename, IOMode mode, DSOpenFlags flags,
 extern gboolean ds_close (Dataset *ds, GError **err);
 
 extern gboolean ds_has_item (Dataset *ds, const gchar *name);
-extern GSList *ds_list_items (Dataset *ds, GError **err)
-    G_GNUC_WARN_UNUSED_RESULT;
+extern gboolean ds_list_items (Dataset *ds, GSList **items, GError **err);
 extern IOStream *ds_open_large_item (Dataset *ds, const gchar *name, IOMode mode,
 				     DSOpenFlags flags, GError **err);
 extern DSItemInfo *ds_probe_item (Dataset *ds, const gchar *name, GError **err);

@@ -483,33 +483,38 @@ ds_has_item (Dataset *ds, const gchar *name)
 
 /* Caller's reponsibility to free the list as well as its
  * contents */
-GSList *
-ds_list_items (Dataset *ds, GError **err)
+gboolean
+ds_list_items (Dataset *ds, GSList **items, GError **err)
 {
-    GSList *items = NULL;
+    GSList *itemwork = NULL;
     GDir *dir;
     const gchar *diritem;
     GHashTableIter hiter;
 
+    *items = NULL;
     _ds_set_name_dir (ds);
     dir = g_dir_open (ds->namebuf, 0, err);
 
     if (dir == NULL)
-	return NULL;
+	return TRUE;
 
     while ((diritem = g_dir_read_name (dir)) != NULL) {
 	if (strlen (diritem) > DS_ITEMNAME_MAXLEN)
+	    continue;
+
+	if (strcmp (diritem, "header") == 0)
 	    continue;
 
 	if (g_hash_table_lookup (ds->small_items, diritem) != NULL) {
 	    g_set_error (err, DS_ERROR, DS_ERROR_FORMAT,
 			 "Invalid dataset: item %s has both file "
 			 "and header entry.", diritem);
-	    g_slist_foreach (items, (GFunc) g_free, NULL);
-	    g_slist_free (items);
+	    g_slist_foreach (itemwork, (GFunc) g_free, NULL);
+	    g_slist_free (itemwork);
+	    return TRUE;
 	}
 
-	items = g_slist_prepend (items, g_strdup (diritem));
+	itemwork = g_slist_prepend (itemwork, g_strdup (diritem));
     }
 
     g_dir_close (dir);
@@ -517,9 +522,10 @@ ds_list_items (Dataset *ds, GError **err)
 
     while (g_hash_table_iter_next (&hiter, (gpointer *) &diritem, 
 				   NULL))
-	items = g_slist_prepend (items, g_strdup (diritem));
+	itemwork = g_slist_prepend (itemwork, g_strdup (diritem));
 
-    return items;
+    *items = itemwork;
+    return FALSE;
 }
 
 static IOStream *

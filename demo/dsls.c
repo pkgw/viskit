@@ -20,7 +20,7 @@ main (int argc, char **argv)
 	return 1;
     }
 
-    if ((items = ds_list_items (ds, &err)) == NULL) {
+    if (ds_list_items (ds, &items, &err)) {
 	fprintf (stderr, "Error scanning items in \"%s\": %s\n",
 		 argv[1], err->message);
 	return 1;
