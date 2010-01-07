@@ -732,6 +732,10 @@ ds_probe_item (Dataset *ds, const gchar *name, GError **err)
     dii->is_large = is_large;
     dii->type = type;
     dii->nvals = nvals;
+
+    if (!is_large)
+	memcpy (dii->small.i8, DSI_DATA (small), nvals * ds_type_sizes[type]);
+
     return dii;
 }
 

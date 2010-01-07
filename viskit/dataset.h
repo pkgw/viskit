@@ -69,6 +69,15 @@ typedef struct _DSItemInfo {
     gboolean is_large;
     DSType type;
     gsize nvals;
+    union {
+	gint8 i8[64];
+	gint16 i16[32];
+	gint32 i32[16];
+	gint64 i64[8];
+	gfloat f32[16];
+	gdouble f64[8];
+	gchar text[64];
+    } small;
 } DSItemInfo;
 
 extern Dataset *ds_open (const char *filename, IOMode mode, DSOpenFlags flags,
