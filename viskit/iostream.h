@@ -53,4 +53,6 @@ extern gboolean io_write_typed (IOStream *io, DSType type, gsize nvals,
 
 extern gboolean io_nudge_align (IOStream *io, gsize align_size, GError **err);
 
+extern gboolean io_pipe (IOStream *input, IOStream *output, GError **err);
+
 #endif

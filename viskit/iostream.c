@@ -700,3 +700,45 @@ io_write_typed (IOStream *io, DSType type, gsize nvals, gconstpointer buf,
 
     return FALSE;
 }
+
+
+gboolean
+io_pipe (IOStream *input, IOStream *output, GError **err)
+{
+    gsize neof;
+
+    /* Invariants to make life easier. */
+    g_return_val_if_fail (input->bufsz == output->bufsz, TRUE);
+    g_assert (input->mode & IO_MODE_READ);
+    g_assert (output->mode & IO_MODE_WRITE);
+
+    if (input->s.read.curpos == input->bufsz) {
+	if (_io_read (input, err))
+	    return TRUE;
+    }
+
+    if (output->s.write.curpos == output->bufsz) {
+	if (_io_write (output, err))
+	    return TRUE;
+    }
+
+    g_return_val_if_fail (input->s.read.curpos == output->s.write.curpos, TRUE);
+
+    while (!input->s.read.eof) {
+	if (_io_fd_write (output->fd, input->s.read.buf + input->s.read.curpos,
+			  input->bufsz - input->s.read.curpos, err))
+	    return TRUE;
+	if (_io_read (input, err))
+	    return TRUE;
+    }
+
+    neof = input->s.read.endpos - input->s.read.curpos;
+
+    if (neof > 0) {
+	if (_io_fd_write (output->fd, input->s.read.buf + input->s.read.curpos,
+			  neof, err))
+	    return TRUE;
+    }
+
+    return FALSE;
+}
