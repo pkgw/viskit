@@ -56,7 +56,7 @@ typedef struct _DSSmallItem {
 static IOStream *_ds_open_large_item_full (Dataset *ds, const gchar *name,
 					   IOMode mode, DSOpenFlags flags,
 					   gboolean trunc_ok, gboolean check_name,
-					   GError **err);
+					   int *errno_dest, GError **err);
 static gboolean _ds_item_name_ok (const gchar *name, GError **err);
 static gboolean _ds_rename_large_item_full (Dataset *ds, const gchar *oldname,
 					    const gchar *newname, gboolean check_new_name,
@@ -531,7 +531,7 @@ ds_list_items (Dataset *ds, GSList **items, GError **err)
 static IOStream *
 _ds_open_large_item_full (Dataset *ds, const gchar *name, IOMode mode,
 			  DSOpenFlags flags, gboolean trunc_ok,
-			  gboolean check_name, GError **err)
+			  gboolean check_name, int *errno_dest, GError **err)
 {
     /* Note: this function is called in ds_open to read the header, so
      * keep in mind that ds may not be fully initialized. */
@@ -577,6 +577,8 @@ _ds_open_large_item_full (Dataset *ds, const gchar *name, IOMode mode,
     if (fd < 0) {
 	IO_ERRNO_ERRV (err, errno, "Failed to open item file \"%s\"",
 		       ds->namebuf);
+	if (errno_dest != NULL)
+	    *errno_dest = errno;
 	return NULL;
     }
 
@@ -591,7 +593,7 @@ IOStream *
 ds_open_large_item (Dataset *ds, const gchar *name, IOMode mode,
 		    DSOpenFlags flags, GError **err)
 {
-    return _ds_open_large_item_full (ds, name, mode, flags, FALSE, TRUE, err);
+    return _ds_open_large_item_full (ds, name, mode, flags, FALSE, TRUE, NULL, err);
 }
 
 IOStream *
@@ -603,7 +605,7 @@ ds_open_large_item_for_replace (Dataset *ds, const gchar *name, GError **err)
     repname = g_strconcat (name, "+new", NULL);
     retval = _ds_open_large_item_full (ds, repname, IO_MODE_WRITE,
 				       DS_OFLAGS_TRUNCATE | DS_OFLAGS_CREATE_OK,
-				       TRUE, FALSE, err);
+				       TRUE, FALSE, NULL, err);
     g_free (repname);
     return retval;
 }
@@ -623,7 +625,7 @@ ds_finish_large_item_replace (Dataset *ds, const gchar *name, GError **err)
 
 static gboolean
 _ds_probe_large_item (Dataset *ds, const gchar *name, DSType *type,
-		      gsize *nvals, GError **err)
+		      gsize *nvals, int *openerr, GError **err)
 {
     IOStream *io;
     gssize nread;
@@ -637,8 +639,9 @@ _ds_probe_large_item (Dataset *ds, const gchar *name, DSType *type,
     *nvals = 0;
     retval = TRUE;
 
-    if ((io = ds_open_large_item (ds, name, IO_MODE_READ, 0, err)) == NULL)
-	goto done;
+    if ((io = _ds_open_large_item_full (ds, name, IO_MODE_READ, 0, FALSE,
+					TRUE, openerr, err)) == NULL)
+	return TRUE;
 
     if (fstat (io_get_fd (io), &statbuf)) {
 	IO_ERRNO_ERRV (err, errno, "Unable to stat dataset item \"%s\"", name);
@@ -707,15 +710,17 @@ done:
 }
 
 
-DSItemInfo *
-ds_probe_item (Dataset *ds, const gchar *name, GError **err)
+gboolean
+ds_probe_item (Dataset *ds, const gchar *name, DSItemInfo **info, GError **err)
 {
     DSItemInfo *dii;
     DSSmallItem *small;
     gboolean is_large;
     DSType type;
     gsize nvals;
+    int openerr;
 
+    *info = NULL;
     small = (DSSmallItem *) g_hash_table_lookup (ds->small_items, name);
     is_large = (small == NULL);
 
@@ -723,11 +728,11 @@ ds_probe_item (Dataset *ds, const gchar *name, GError **err)
 	type = small->type;
 	nvals = small->nvals;
     } else {
-	if (_ds_probe_large_item (ds, name, &type, &nvals, err))
-	    return NULL;
+	if (_ds_probe_large_item (ds, name, &type, &nvals, &openerr, err))
+	    return openerr != ENOENT;
     }
 
-    dii = g_new0 (DSItemInfo, 1);
+    *info = dii = g_new0 (DSItemInfo, 1);
     dii->name = g_strdup (name);
     dii->is_large = is_large;
     dii->type = type;
@@ -736,7 +741,7 @@ ds_probe_item (Dataset *ds, const gchar *name, GError **err)
     if (!is_large)
 	memcpy (dii->small.i8, DSI_DATA (small), nvals * ds_type_sizes[type]);
 
-    return dii;
+    return FALSE;
 }
 
 void

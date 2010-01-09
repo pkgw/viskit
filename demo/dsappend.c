@@ -35,7 +35,7 @@ main (int argc, char **argv)
     for (iter = items; iter; iter = iter->next) {
 	DSItemInfo *dsii;
 
-	if ((dsii = ds_probe_item (dsin, (gchar *) iter->data, &err)) == NULL) {
+	if (ds_probe_item (dsin, (gchar *) iter->data, &dsii, &err)) {
 	    fprintf (stderr, "Error probing item \"%s\" in %s: %s\n",
 		     (gchar *) iter->data, argv[1], err->message);
 	    return 1;
@@ -43,10 +43,10 @@ main (int argc, char **argv)
 
 	if (!dsii->is_large) {
 	    if (ds_has_item (dsout, dsii->name)) {
-		DSItemInfo *outii = ds_probe_item (dsout, dsii->name, &err);
+		DSItemInfo *outii;
 		size_t nbytes;
 
-		if (outii == NULL) {
+		if (ds_probe_item (dsout, dsii->name, &outii, &err)) {
 		    fprintf (stderr, "Error probing small item \"%s\" in %s: %s\n",
 			     dsii->name, argv[2], err->message);
 		    return 1;

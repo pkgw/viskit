@@ -89,7 +89,8 @@ extern gboolean ds_has_item (Dataset *ds, const gchar *name);
 extern gboolean ds_list_items (Dataset *ds, GSList **items, GError **err);
 extern IOStream *ds_open_large_item (Dataset *ds, const gchar *name, IOMode mode,
 				     DSOpenFlags flags, GError **err);
-extern DSItemInfo *ds_probe_item (Dataset *ds, const gchar *name, GError **err);
+extern gboolean ds_probe_item (Dataset *ds, const gchar *name, DSItemInfo **info,
+			       GError **err);
 extern void ds_item_info_free (DSItemInfo *dii);
 
 extern IOStream *ds_open_large_item_for_replace (Dataset *ds, const gchar *name,

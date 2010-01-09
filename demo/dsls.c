@@ -31,9 +31,7 @@ main (int argc, char **argv)
 	gint64 ival;
 	gdouble dval;
 
-	dii = ds_probe_item (ds, name, &err);
-
-	if (dii == NULL) {
+	if (ds_probe_item (ds, name, &dii, &err)) {
 	    fprintf (stderr, "Error probing item \"%s\" in \"%s\": %s\n",
 		     name, argv[1], err->message);
 	    return 1;
