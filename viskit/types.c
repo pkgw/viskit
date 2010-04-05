@@ -37,10 +37,11 @@ typedef union _Dataptr {
     gint64 *i64;
     gfloat *f32;
     gdouble *f64;
+    vkcomplex64 *c64;
     gchar *text;
 } Dataptr;
 
-#define UPCONV_BEGIN(dglib,dlowname)			\
+#define UPCONV_BEGIN(dglib,dlowname) \
  static gboolean \
  _ds_type_upconvert_##dlowname (DSType srctype, gpointer srcdata, gpointer destdata, \
 			     gsize nvals) \
@@ -88,6 +89,14 @@ UPCONV_DO(gdouble,I64,i64)
 UPCONV_DO(gdouble,F32,f32)
 UPCONV_END(gdouble)
 
+UPCONV_BEGIN(vkcomplex64,c64)
+UPCONV_DO(vkcomplex64,I8,i8)
+UPCONV_DO(vkcomplex64,I16,i16)
+UPCONV_DO(vkcomplex64,I32,i32)
+UPCONV_DO(vkcomplex64,I64,i64)
+UPCONV_DO(vkcomplex64,F32,f32)
+UPCONV_END(vkcomplex64)
+
 gboolean
 ds_type_upconvert (DSType srctype, gpointer srcdata, DSType desttype,
 		   gpointer destdata, gsize nvals)
@@ -108,6 +117,8 @@ ds_type_upconvert (DSType srctype, gpointer srcdata, DSType desttype,
 	return _ds_type_upconvert_f32 (srctype, srcdata, destdata, nvals);
     case DST_F64:
 	return _ds_type_upconvert_f64 (srctype, srcdata, destdata, nvals);
+    case DST_C64:
+	return _ds_type_upconvert_c64 (srctype, srcdata, destdata, nvals);
     default:
 	return TRUE;
     }

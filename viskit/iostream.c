@@ -22,7 +22,6 @@ static gboolean _io_read (IOStream *io, GError **err);
 static gboolean _io_write (IOStream *io, GError **err);
 
 
-
 /* Dealing with endianness conversion: MIRIAD datasets are
  * standardized to big-endian */
 
@@ -34,6 +33,7 @@ typedef union _IOBufptr {
     gint64 *i64;
     gfloat *f32;
     gdouble *f64;
+    vkcomplex64 *c64;
     gchar *text;
 } IOBufptr;
 
@@ -45,6 +45,7 @@ typedef union _IOConstBufptr {
     const gint64 *i64;
     const gfloat *f32;
     const gdouble *f64;
+    const vkcomplex64 *c64;
     const gchar *text;
 } IOConstBufptr;
 

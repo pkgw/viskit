@@ -2,6 +2,7 @@
 #define _VISKIT_TYPES_H
 
 #include <glib.h>
+#include <complex.h>
 
 typedef enum _DSType {
     DST_BIN  = 0, /* used for heterogeneous binary data */
@@ -14,6 +15,8 @@ typedef enum _DSType {
     DST_C64  = 7,
     DST_I64  = 8
 } DSType;
+
+typedef float complex vkcomplex64;
 
 #define DST_VALID(v) ((v) >= 0 && (v) < 9)
 
