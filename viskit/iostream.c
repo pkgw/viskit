@@ -59,9 +59,7 @@ io_recode_data_copy (const gchar *src, gchar *dest, DSType type, gsize nvals)
     bdest.any = dest;
 
     switch (type) {
-    case DST_UNK:
-	g_assert (nvals == 0);
-	break;
+    case DST_BIN:
     case DST_I8:
     case DST_TEXT:
 	memcpy (dest, src, nvals);
@@ -107,9 +105,7 @@ io_recode_data_inplace (gchar *data, DSType type, gsize nvals)
     bdata.any = data;
 
     switch (type) {
-    case DST_UNK:
-	g_assert (nvals == 0);
-	break;
+    case DST_BIN:
     case DST_I8:
     case DST_TEXT:
 	break;

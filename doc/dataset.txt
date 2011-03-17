@@ -68,6 +68,7 @@ must be aligned to its size with the exception of the complex type.)
 
  Type Align Abbr Code Name
 
+ bin  1     ?    0    binary/unknown/heterogeneous
  i8   8     b    1    byte
  i16  16    j    3    short
  i32  32    i    2    int
@@ -77,6 +78,7 @@ must be aligned to its size with the exception of the complex type.)
  c64  32    c    7    complex
  text 8     a    6    text
 
+The binary type is used for heterogeneous binary data in some cases.
 All text is ASCII-encoded in 8-bit characters.
 
 Filesystem Representation
@@ -114,6 +116,7 @@ Immediately after each table entry are the data corresponding to the
 entry. Zero-length items have no data record.
 
 The first 4 bytes of a data record the typecode of the data in an i32.
+The binary/unknown/heterogeneous type is allowed.
 
 The next S-4 bytes of the data record store the actual data values,
 subject to alignment restrictions. If the offset of the byte

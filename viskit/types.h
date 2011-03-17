@@ -4,7 +4,7 @@
 #include <glib.h>
 
 typedef enum _DSType {
-    DST_UNK  = 0, /* not an actual type used in the file format */
+    DST_BIN  = 0, /* used for heterogeneous binary data */
     DST_I8   = 1,
     DST_I32  = 2,
     DST_I16  = 3,
@@ -15,7 +15,7 @@ typedef enum _DSType {
     DST_I64  = 8
 } DSType;
 
-#define DST_VALID(v) ((v) > 0 && (v) < 9)
+#define DST_VALID(v) ((v) >= 0 && (v) < 9)
 
 extern const char ds_type_codes[];
 extern const guint8 ds_type_sizes[];

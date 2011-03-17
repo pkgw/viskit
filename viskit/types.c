@@ -10,18 +10,18 @@ const char ds_type_codes[] = "?bijrdacl";
 
 const guint8 ds_type_sizes[] = {
     /* Item sizes in bytes. */
-    0, 1, 4, 2, 4, 8, 1, 8, 8
+    1, 1, 4, 2, 4, 8, 1, 8, 8
 };
 
 const guint8 ds_type_aligns[] = {
     /* Alignment requirements for datatypes.  Identical to item sizes
      * except for the complex type, which can be aligned to the size
      * of its constituents. */
-    0, 1, 4, 2, 4, 8, 1, 4, 8
+    1, 1, 4, 2, 4, 8, 1, 4, 8
 };
 
 const gchar *ds_type_names[] = {
-    "unknown", "int8", "int32", "int16", "float32",
+    "binary", "int8", "int32", "int16", "float32",
     "float64", "text", "complex64", "int64"
 };
 
@@ -146,7 +146,7 @@ ds_type_format (gpointer data, DSType type, gssize nvals)
 	    g_string_append (s, ", ");
 
 	switch (type) {
-	case DST_UNK:
+	case DST_BIN:
 	    g_string_append (s, fmt);
 	    break;
 	case DST_I8:

@@ -190,7 +190,7 @@ _ds_read_header (Dataset *ds, GError **err)
 
 	if (hitem->alen == 0) {
 	    /* No data for this item. */
-	    si->type = DST_UNK;
+	    si->type = DST_BIN;
 	    si->nvals = 0;
 	} else {
 	    guint8 align;
@@ -635,7 +635,7 @@ _ds_probe_large_item (Dataset *ds, const gchar *name, DSType *type,
     struct stat statbuf;
     int ofs;
 
-    *type = DST_UNK;
+    *type = DST_BIN;
     *nvals = 0;
     retval = TRUE;
 
@@ -679,13 +679,13 @@ _ds_probe_large_item (Dataset *ds, const gchar *name, DSType *type,
 	*nvals = (statbuf.st_size - ofs) / ds_type_sizes[*type];
 
 	if (*nvals * ds_type_sizes[*type] + ofs != statbuf.st_size) {
-	    *type = DST_UNK;
+	    *type = DST_BIN;
 	    *nvals = 0;
 	}
 
 	goto done;
     case 0:
-	/* Mixed binary type. Express it as DST_UNKNOWN but give it
+	/* Mixed binary type. Express it as DST_BIN but give it
 	 * a size in bytes. */
 	*nvals = statbuf.st_size - 4;
     default:
