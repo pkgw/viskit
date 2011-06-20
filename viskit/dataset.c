@@ -214,7 +214,7 @@ _ds_read_header (Dataset *ds, GError **err)
 
 	    if (!DST_VALID (si->type)) {
 		g_set_error (err, DS_ERROR, DS_ERROR_FORMAT,
-			     "Invalid dataset header: illegal type code");
+			     "Invalid dataset header: illegal type code 0x%x", si->type);
 		goto bail;
 	    }
 
