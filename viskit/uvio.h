@@ -3,8 +3,6 @@
 
 #include <viskit/dataset.h>
 
-/* Reading interface */
-
 typedef struct _UVIO UVIO;
 
 typedef enum _UVEntryType {
@@ -32,11 +30,12 @@ extern gboolean uvio_close (UVIO *uvio, GError **err);
 
 extern GList *uvio_list_vars (UVIO *uvio);
 extern UVVariable *uvio_query_var (UVIO *uvio, const gchar *name);
+extern UVVariable *uvio_query_var_by_ident (UVIO *uvio, const guint8 ident);
 
 extern UVEntryType uvio_read_next (UVIO *uvio, gpointer *data, GError **err);
 
 extern gboolean uvio_write_var (UVIO *uvio, const gchar *name,
-				DSType type, guint32 nvals, const gpointer data,
+				DSType type, guint32 nvals, const gconstpointer data,
 				GError **err);
 extern gboolean uvio_write_end_record (UVIO *uvio, GError **err);
 extern gboolean uvio_update_vartable (UVIO *uvio, GError **err);

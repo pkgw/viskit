@@ -299,6 +299,16 @@ uvio_query_var (UVIO *uvio, const gchar *name)
 }
 
 
+UVVariable *
+uvio_query_var_by_ident (UVIO *uvio, const guint8 ident)
+{
+    /* Not valid to call before uvio_open has been run */
+    g_assert (uvio->vars_by_name != NULL);
+
+    return uvio->vars[ident];
+}
+
+
 UVEntryType
 uvio_read_next (UVIO *uvio, gpointer *data, GError **err)
 {
@@ -409,7 +419,7 @@ uvio_read_next (UVIO *uvio, gpointer *data, GError **err)
 
 gboolean
 uvio_write_var (UVIO *uvio, const gchar *name,
-		DSType type, guint32 nvals, const gpointer data,
+		DSType type, guint32 nvals, const gconstpointer data,
 		GError **err)
 {
     UVHeader header = { 0, 0, 0, 0 };
