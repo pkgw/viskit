@@ -218,18 +218,13 @@ _ds_read_header (Dataset *ds, GError **err)
 		goto bail;
 	    }
 
-	    data += 4;
+	    /* The header-writing code aligns based on the type sizes,
+	     * not the type alignment values (which is relevant for
+	     * complex-valued headers) */
 
-	    /* We may have to jump around a bit to realign ourselves if
-	     * this small item is an 8-byte type. */
-
-	    align = ds_type_aligns[si->type];
-	    dlen = hitem->alen - 4;
-
-	    if (4 % align > 0) {
-		data += align - (4 % align);
-		dlen -= align - (4 % align);
-	    }
+	    align = MAX (4, ds_type_sizes[si->type]);
+	    data += align;
+	    dlen = hitem->alen - align;
 
 	    if (dlen % ds_type_sizes[si->type] != 0) {
 		g_set_error (err, DS_ERROR, DS_ERROR_FORMAT,
